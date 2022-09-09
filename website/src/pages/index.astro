@@ -1,0 +1,98 @@
+---
+import {
+  getNotionPage,
+  getAllNotionPages,
+  getBlockChildrenRecursively,
+  treeToMd,
+} from "../services/notion.mjs";
+
+import { serialize } from "next-mdx-remote/serialize";
+import { MDXRemote } from "next-mdx-remote";
+import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
+import { remarkMdxFrontmatter } from "remark-mdx-frontmatter";
+import remarkUnwrapImages from "remark-unwrap-images";
+import remarkGfm from "remark-gfm";
+import rehypeSlug from "rehype-slug";
+
+import { components } from "@components/ReactComponents.jsx";
+// import { Image, Picture } from "@astrojs/image/components";
+
+// const components = {};
+
+// import Test from '../components/test'
+// const components = { Test }
+
+// const _page = await getNotionPage("c7c322b6b3ad4d91845b24ede3bbec62"); // Tests
+const _page = await getNotionPage("3a8139fa6da8407c98d716fef90b15f7"); // Index
+// const _page = await getNotionPage("09fbda62943649ef8ab7e05d8a3158d5"); // Blog
+
+const _children = await getBlockChildrenRecursively(_page);
+const _md = treeToMd(_children);
+
+// const pages = await getAllNotionPages();
+// const _allRawPages = await getAllNotionPages();
+// const allRawPages = await Promise.all(
+//   _allRawPages.map(async (p) => {
+//     // We don't provide 'allRawPages' so that link_to_page & child_page blocks are not populated
+//     const _c = await getBlockChildrenRecursively(p);
+//     const _md = treeToMd(_c);
+//     // const { exports: _MDXExportsSelf } = await toMdx(_md);
+
+//     return {
+//       ...p,
+//       children: _c,
+//       _md,
+//       // _MDXExportsSelf,
+//     };
+//   })
+// );
+
+// MDX text - can be from a local file, database, anywhere
+// const source = "Some **mdx** text, with a component <Test />";
+// const source = "Some **mdx** text, with a component";
+// const source = allRawPages[4]._md;
+const source = _md;
+const mdxSource = await serialize(source, {
+  // made available to the arguments of any custom mdx component
+  scope: {},
+  // MDX's available options, see the MDX docs for more info.
+  // https://mdxjs.com/packages/mdx/#compilefile-options
+  mdxOptions: {
+    remarkPlugins: [
+      [
+        remarkFrontmatter,
+        {
+          type: "yaml",
+          fence: { open: "```yaml", close: "```" },
+          //   anywhere: true,
+        },
+      ],
+      // remarkMdxFrontmatter,
+      // remarkUnwrapImages,
+      // remarkGfm,
+    ],
+    // rehypePlugins: [rehypeSlug],
+    format: "mdx",
+  },
+  // Indicates whether or not to parse the frontmatter from the mdx source
+  parseFrontmatter: false,
+});
+
+// console.log({ source, mdxSource });
+---
+
+<!-- Below is your "component template." It's just HTML, but with
+     some magic sprinkled in to help you build great templates. -->
+<html>
+  <body>
+    <h1>Hello, World!</h1>
+
+    <MDXRemote {...mdxSource} components={components} />
+
+    <style>
+      h1 {
+        color: orange;
+      }
+    </style>
+  </body>
+</html>

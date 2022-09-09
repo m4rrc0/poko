@@ -1,0 +1,27 @@
+{
+  "name": "@m4rrc0/poko",
+  "description": "A free open source website builder based on popular services",
+  "workspaces": [
+    "website",
+    "services/*",
+    "astro-integrations/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "test": "echo \"Error: no test specified\" && exit 1",
+    "dev:debug": "npm run dev:debug --workspace=website",
+    "dev": "npm run dev --workspace=website",
+    "start": "npm start --workspace=website",
+    "build": "npm run build --workspace=website",
+    "build:netlify": "cd website && npm run build",
+    "build:debug": "npm run build:debug --workspace=website",
+    "preview": "npm run preview --workspace=website",
+    "serve": "npm run serve --workspace=website",
+    "clean": "npm run clean --workspace=website",
+    "fetch:once": "npm run fetch:once --workspace=website",
+    "fetch:watch": "npm run fetch:watch --workspace=website",
+    "dev:watch": "npm run dev:watch --workspace=website"
+  },
+  "author": "m4rrc0",
+  "license": "AGPL-3.0-or-later"
+}

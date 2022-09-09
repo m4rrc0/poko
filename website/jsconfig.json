@@ -1,0 +1,26 @@
+{
+  "compilerOptions": {
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
+    "baseUrl": ".",
+    "paths": {
+      "@src/*": ["src/*"],
+      "@components/*": ["src/components/*"],
+      "@components": ["src/components/index.js"],
+      "@elements/*": ["src/elements/*"],
+      "@elements": ["src/elements/index.js"],
+      "@layouts/*": ["src/layouts/*"],
+      "@layouts": ["src/layouts/index.js"],
+      "@pages/*": ["src/pages/*"],
+      "@partials/*": ["src/partials/*"],
+      "@partials": ["src/partials/index.js"],
+      "@services/*": ["src/services/*"],
+      "@services": ["src/services/index.js"],
+      "@styles/*": ["src/styles/*"],
+      "@utils/*": ["src/utils/*"],
+      "@utils": ["src/utils/index.mjs"],
+      "@public/*": ["public/*"],
+      "@poko": ["src/_data/poko.json"]
+    }
+  }
+}
