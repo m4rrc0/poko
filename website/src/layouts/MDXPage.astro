@@ -1,0 +1,70 @@
+---
+// import Debug from 'astro/debug';
+// import { notionHelpers } from "@utils";
+import { SkeletonPage } from "@layouts";
+// import pokoComponents, { addProps } from "../components/components.jsx";
+// import { toMdx } from '@services/notion.mjs'
+import MDXBundler from "../components/MDXBundler.jsx";
+import { bundleMDX } from "mdx-bundler";
+// import { getMDXExport } from "mdx-bundler/client/index.js";
+// import { MDXRemote } from "next-mdx-remote";
+import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
+import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+// import remarkUnwrapImages from "remark-unwrap-images";
+import remarkGfm from "remark-gfm";
+// import rehypeSlug from "rehype-slug";
+
+const mdxConfig = {
+  mdxOptions(options, frontmatter) {
+    options.remarkPlugins = [
+      ...(options.remarkPlugins ?? []),
+      // [
+      //   remarkFrontmatter,
+      //   {
+      //     type: "yaml",
+      //     fence: { open: "```yaml", close: "```" },
+      //     // anywhere: true,
+      //   },
+      // ],
+      // remarkMdxFrontmatter,
+      // remarkUnwrapImages,
+      remarkGfm,
+    ];
+    options.rehypePlugins = [
+      ...(options.rehypePlugins ?? []),
+      // rehypeSlug
+    ];
+    return options;
+  },
+  // esbuildOptions(options, frontmatter) {
+  //   // options.minify = false;
+  //   // options.target = ['es2020','chrome58','firefox57','safari11','edge16','node12']
+  //   return options;
+  // },
+  //   files: {"./demo.tsx": `
+  // import * as React from 'react'
+  // function Demo() {return <div>Neat demo!</div>}
+  // export default Demo`},
+}
+
+const { href, pathname } = new URL(Astro.url.pathname, Astro.site);
+const { page, tree, globalStylesString, headString } =
+  Astro.props;
+
+const { md, props } = page;
+
+const mdx = md
+  ? await bundleMDX({source: md, ...mdxConfig})
+  : { code: undefined };
+
+const { code } = mdx
+
+// console.log(props.components)
+
+---
+
+<SkeletonPage {...{ path: pathname, ...props}}>
+  <Fragment slot="head" set:html={headString} />
+
+  {code ? <MDXBundler {...{ code, frontmatter: undefined, props }} /> : null}
+</SkeletonPage>

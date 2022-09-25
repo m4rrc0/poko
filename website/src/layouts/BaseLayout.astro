@@ -1,0 +1,73 @@
+---
+// 1. The frontmatter prop gives access to frontmatter and other data
+const { frontmatter } = Astro.props;
+
+console.log("\n", Astro.url.pathname, "\n");
+
+let html: string = "";
+if (Astro.slots.has("default")) {
+  html = await Astro.slots.render("default");
+}
+
+// console.log(Astro.slots.render("default"));
+console.log(Astro.props);
+const { Content } = Astro.props;
+
+// When using the automatic mdx files retrieval
+// props: {
+//     file: '/home/marc/code/poko/poko/website/src/pages/md/test.mdx',
+//     url: '/md/test',
+//     content: {
+//       some: 'var',
+//       file: '/home/marc/code/poko/poko/website/src/pages/md/test.mdx',
+//       url: '/md/test',
+//       astro: {}
+//     },
+//     frontmatter: {
+//       some: 'var',
+//       file: '/home/marc/code/poko/poko/website/src/pages/md/test.mdx',
+//       url: '/md/test',
+//       astro: {}
+//     },
+//     headings: [
+//      {
+//          depth: 1,
+//          slug: "here-is-a-title-for-good-measure",
+//          text: "Here is a title for good measure",
+//      },
+//     ],
+//     'server:root': true
+//   }
+
+// When using glob and layout
+// {
+//   frontmatter: { some: 'var', layout: '../../layouts/BaseLayout.astro' },
+//   getHeadings: [Function: getHeadings],
+//   default: [Function: MDXContent] { [Symbol(astro.needsHeadRendering)]: false },
+//   url: '/md/test',
+//   file: '/home/marc/code/poko/poko/website/src/pages/md/test.mdx',
+//   rawContent: [Function: rawContent],
+//   compiledContent: [Function: compiledContent],
+//   Content: [Function: MDXContent] { [Symbol(astro.needsHeadRendering)]: false },
+//   class: 'astro-OJTHRHTM',
+//   [Symbol(Symbol.toStringTag)]: 'Module'
+// }
+---
+
+<html>
+  <head>
+    <!-- Add other Head elements here, like styles and meta tags. -->
+    <title>{frontmatter.title}</title>
+  </head>
+  <body>
+    <!-- Add other UI components here, like common headers and footers. -->
+    <h1>{frontmatter.title} by {frontmatter.author}</h1>
+    <!-- 2. Rendered HTML will be passed into the default slot. -->
+    <slot />
+
+    <!-- <Fragment set:html={compiledContent} /> -->
+    <!-- <Content /> -->
+
+    <p>Written on: {frontmatter.date}</p>
+  </body>
+</html>

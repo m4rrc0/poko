@@ -1,0 +1,787 @@
+---
+import Debug from "astro/debug";
+import { existsSync, promises as fs } from "fs";
+import { copy } from "fs-extra";
+// import { getMDXExport } from "mdx-bundler/client/index.js";
+import { u } from "unist-builder";
+import { visit } from "unist-util-visit";
+import { visitParents } from "unist-util-visit-parents";
+import _get from "lodash.get";
+import jsYaml from "js-yaml";
+import hash from "object-hash";
+// import * as Preact from 'preact'
+import { bundleMDX } from "mdx-bundler";
+import { getMDXExport } from "mdx-bundler/client/index.js";
+// import { MDXRemote } from "next-mdx-remote";
+import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
+import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+// import remarkUnwrapImages from "remark-unwrap-images";
+import remarkGfm from "remark-gfm";
+// import rehypeSlug from "rehype-slug";
+import nanomemoize from 'nano-memoize'
+import { getImage, getPicture } from "@astrojs/image";
+import probeImageSize from "probe-image-size";
+
+import {
+  slugifyPath,
+  parseFileUrl,
+  escapeRegExp,
+  deepMergePropsSelf,
+  deepMergePropsAllPages,
+  probeFile,
+  probeHeaders,
+  downloadFile,
+  extractZip,
+} from "@utils/index.mjs";
+import {
+  getNotionPage,
+  getAllNotionPages,
+  getBlockChildrenRecursively,
+  notionBlockToMd,
+  treeToMd,
+  populateChildPageOfBlock,
+  transformRawPage,
+  transformRichTextToPlainText,
+  transformProp,
+  rootId,
+  dicoNotionBlockTypes,
+} from "@services/notion.mjs";
+import { MDXPage, HandlebarsPage } from "@layouts";
+
+
+export async function getStaticPaths() {
+  const dirUserAssets = "user-assets";
+  const fileData = "poko.json";
+  const fileHash = ".hash";
+  const projectDirPublic = "public";
+
+  const projectDirData = "src/_data";
+  const projectFileData = `${projectDirData}/${fileData}`;
+  const systemDirData = `${process.cwd()}/${projectDirData}`;
+  const systemFileData = `${process.cwd()}/${projectFileData}`;
+
+  const projectDirHash = projectDirData;
+  const projectFileHash = `${projectDirData}/${fileHash}`;
+  const systemDirHash = `${process.cwd()}/${projectDirHash}`;
+  const systemFileHash = `${process.cwd()}/${projectFileHash}`;
+
+  const projectDirUserAssets1 = `${projectDirPublic}/${dirUserAssets}`;
+  const projectDirUserAssets2 = `${projectDirData}/${dirUserAssets}`;
+  const systemDirUserAssets1 = `${process.cwd()}/${projectDirUserAssets1}`;
+  const systemDirUserAssets2 = `${process.cwd()}/${projectDirUserAssets2}`;
+  // const projectFileUserAssets = `${projectDirData}/${fileUserAssets}`;
+  // const systemFileUserAssets = `${process.cwd()}/${projectFileUserAssets}`;
+
+  const DEBUG = process.argv.find((str) => str.match("DEBUG"));
+
+  const mdxConfig = {
+      mdxOptions(options, frontmatter) {
+        options.remarkPlugins = [
+          ...(options.remarkPlugins ?? []),
+          // [
+          //   remarkFrontmatter,
+          //   {
+          //     type: "yaml",
+          //     fence: { open: "```yaml", close: "```" },
+          //     // anywhere: true,
+          //   },
+          // ],
+          // remarkMdxFrontmatter,
+          // remarkUnwrapImages,
+          remarkGfm,
+        ];
+        options.rehypePlugins = [
+          ...(options.rehypePlugins ?? []),
+          // rehypeSlug
+        ];
+        return options;
+      },
+      // esbuildOptions(options, frontmatter) {
+      //   // options.minify = false;
+      //   // options.target = ['es2020','chrome58','firefox57','safari11','edge16','node12']
+      //   return options;
+      // },
+      //   files: {"./demo.tsx": `
+      // import * as React from 'react'
+      // function Demo() {return <div>Neat demo!</div>}
+      // export default Demo`},
+  }
+
+  let pokoPrev = {};
+  if (existsSync(systemFileData)) {
+    const _pokoPrev = await fs.readFile(systemFileData);
+    const pokoPrevString = _pokoPrev.toString();
+    pokoPrev = JSON.parse(pokoPrevString);
+  }
+
+  let allRawPages = await getAllNotionPages();
+
+  //
+  // SKIP FETCH IF CONTENT HAS NOT CHANGED
+  //
+  const allLastEditedTimes = allRawPages.map(
+    ({ last_edited_time }) => last_edited_time
+  );
+
+  const contentHashPrev = pokoPrev?.cache?.hash;
+  const contentHash = hash(allLastEditedTimes);
+
+  if (contentHash === contentHashPrev && !DEBUG) {
+    // console.log(`\nCONTENT HASN'T CHANGED UNTIL LAST FETCH - SKIPING!\n`);
+    // TODO: reimplement caching??
+    // return;
+  } else {
+    console.log(`\nCONTENT HAS CHANGED - PROCESSING...\n`);
+  }
+
+  // const _page = await getNotionPage("c7c322b6b3ad4d91845b24ede3bbec62"); // Tests
+  // const _page = await getNotionPage("3a8139fa6da8407c98d716fef90b15f7"); // Index
+  // const _page = await getNotionPage("09fbda62943649ef8ab7e05d8a3158d5"); // Blog
+
+  // const _children = await getBlockChildrenRecursively(_page);
+  // const md = treeToMd(_children);
+  // console.log({ _children });
+
+  let rootID = rootId();
+  let root;
+  let pages = [];
+  let blocks = [];
+  let collections = [];
+  let settings;
+  let globalStylesString = "";
+  let headString = "";
+  let allFiles = [];
+  let allPaths = [];
+
+  // let allRawPages = await getAllNotionPages();
+  allRawPages = allRawPages.map(transformRawPage).filter((z) => z); // computed values: _title, codeName, _titlePropName, parentId
+  allRawPages = await Promise.all(
+    allRawPages.map(async (p) => {
+      // We don't provide 'allRawPages' so that link_to_page & child_page blocks are not populated
+      // const m_getBlockChildrenRecursively = nanomemoize(getBlockChildrenRecursively)
+      const children = await getBlockChildrenRecursively(p);
+      // const md = treeToMd(children);
+      // const m_bundleMDX = nanomemoize(bundleMDX)
+      // const mdx = md
+      //   ? await bundleMDX({source: md, ...mdxConfig})
+      //   : { code: undefined };
+      const mdxBlocksString = children
+        .filter(c => c?.code?.language === "javascript" && c?.code?.rich_text?.[0]?.plain_text?.startsWith("{/*MDX*/}"))
+        .map(c => c?.code?.rich_text?.[0]?.plain_text)
+        .join('\n')
+      const mdxForExports = mdxBlocksString
+        ? await bundleMDX({source: mdxBlocksString, ...mdxConfig})
+        : { code: undefined };
+      const {
+        default: _defaultExport,
+        frontmatter: _frontmatter, // is undefined since we don't parse it with this config
+        ...mdxExports
+      } = getMDXExport(mdxForExports.code) || {};
+
+      // transform files in properties
+      // await Promise.all(
+      //   Object.entries(p.properties).map(async ([key, val]) => {
+      //     if (val.type === 'files' && Array.isArray(val.files)) {
+      //       // p.properties[key].url = ''
+      //       const currentProp = p.properties[key]
+      //       // console.log({ firstFile: currentProp.files[0] })
+            
+      //       await Promise.all(
+      //         currentProp?.files?.map(async (f, i) => {
+      //           // TODO HERE
+      //           const commons = {
+      //             last_edited_time: p.last_edited_time,
+      //             blockId: p.id,
+      //           };
+                
+      //           // const oType = raw.file?.type;
+      //           const originalUrl = f.file?.url;
+      //           const { filename, extension } = parseFileUrl(originalUrl);
+                
+      //           // console.log(extension);
+      
+      //           let propertyType;
+      //           let url;
+      //           let image;
+      //           let file;
+      
+      //           // Images processing
+      //           if (/jpeg|jpg|png|webp|gif|avif|tiff|svg/i.test(extension)) {
+      //             const {
+      //               width,
+      //               height,
+      //               type,
+      //               mime,
+      //               /* mime,wUnits,hUnits,length,url */
+      //             } = await probeImageSize(originalUrl);
+      
+      //             // console.log({ type, mime });
+      
+      //             image = await getImage({
+      //               src: originalUrl,
+      //               format: type,
+      //               width,
+      //               height,
+      //             });
+                  
+      //             propertyType = 'image'
+      //             url = image.src
+
+      //             image.last_edited_time = p.last_edited_time
+      //             image.blockId = p.id
+      //             image.pageId = p.id
+      //             image.originalUrl = originalUrl
+      //             image.filename = filename
+      //             image.extension = extension
+      //             image.url = url
+      
+      //             // console.log({ image });
+      
+      //             // return `<img src="${i.src}" alt="${i.alt}" width="${i.width}" height="${i.height}" />`;
+      //           } else {
+      //             propertyType = 'file'
+      //             url = `/${dirUserAssets}/${filename}`;
+      //             file = {
+      //               ...commons,
+      //               // remoteUrl,
+      //               originalUrl,
+      //               filename,
+      //               extension,
+      //               url,
+      //             };
+                  
+      //             allFiles.push(file)
+      //           }
+      
+      //           // p.properties[key].files[i].type = propertyType
+      //           f.type = propertyType
+      //           // f.last_edited_time = p.last_edited_time
+      //           // f.blockId = p.id
+      //           // f.pageId = p.id
+      //           // f.originalUrl = originalUrl
+      //           // f.filename = filename
+      //           // f.extension = extension
+      //           // f.url = url
+      //           f.image = image
+      //           f.file = file
+                
+      //           // console.log(f)
+      
+      //           // return {
+      //           //   name: f.name,
+      //           //   type: propertyType,
+      //           //   ...commons,
+      //           //   originalUrl,
+      //           //   filename,
+      //           //   extension,
+      //           //   url,
+      //           //   image,
+      //           //   file
+      //           // }
+      //         })
+      //       )
+      //       // console.log({ firstFileAfter: currentProp.files[0] })
+      //     }
+      //   })
+      // )
+
+      return {
+        ...p,
+        children,
+        // md,
+        // mdx,
+        mdxExports
+      };
+    })
+  );
+
+  // Find root of website
+  root = allRawPages.find((p) =>
+    typeof rootID === "string"
+      ? p.id.replace(/-/g, "") === rootID.replace(/-/g, "")
+      : p?.parent?.type === "workspace"
+  );
+
+  if (!root) {
+    throw "No settings page found.\nHave you shared your Notion pages with your integration?";
+  }
+
+  rootID = root.id;
+
+  const tree = u("root", root, root.children);
+
+  visitParents(tree, (node, ancestors) => {
+    const { children: _children, ...raw } = node;
+
+    // Insert pages inside respective blocks into the raw tree
+    if (Array.isArray(_children)) {
+      node.children = _children.map((_c) => {
+        const subChildren = populateChildPageOfBlock(_c, allRawPages);
+        let c = _c;
+        if (subChildren) c.children = subChildren;
+
+        return c;
+      });
+    }
+
+    // node.children = children;
+    // const { children, ...raw } = node;
+
+    // Clean node object
+    Object.keys(raw).forEach((key) => {
+      delete node[key];
+    });
+
+    node.raw = raw;
+    node.id = raw.id;
+    // node.parentId = raw.parentId;
+    // node._titlePropName = raw._titlePropName; // the name of the property holding the 'title' of the page
+    // node._title = raw._title; // the title object
+    node.codeName = raw.codeName; // the plain text version of the title
+    // node.inlineMd = raw.inlineMd;
+    // node.md = raw.md;
+    // node.mdx = raw.mdx;
+
+    // Inline values:
+    //   blockProps is for ex the language of a code block...
+    const { rich_text, ...blockProps } = raw[raw.type] || {};
+    const inlinePlainText = transformRichTextToPlainText(rich_text);
+    node.richText = rich_text;
+    node.blockProps = blockProps;
+    node.inlinePlainText = inlinePlainText;
+    // pages and DBs and Callouts have icon emojis
+    node.emoji = raw.icon?.emoji || raw[raw.type]?.icon?.emoji;
+
+    // Set type and role to identify nodes more easily
+    if (raw.type === "root") {
+      node.type = "root";
+      node.role = "settings";
+    } else if (raw.object === "page") {
+      node.type = "page";
+      node.role = "page";
+    } else if (raw.object === "database") {
+      node.type = "page";
+      node.role = "collection";
+    } else if (raw.object === "block") {
+      node.type = "block";
+      node.role = dicoNotionBlockTypes[raw.type];
+    } else {
+      console.warn(
+        `WARNING: the following node does not have a recognizable type`
+      );
+      console.warn(JSON.stringify(raw));
+    }
+
+    if (node.type === "root" || node.type === "page") {
+      node.status = raw.archived ? "archived" : "published";
+
+      // Setup parents on every page (even hidden pages)
+      const parents = ancestors
+        ?.filter((a) => a.type === "page" || a.type === "root")
+        // Remove keys we don't need from parents
+        .map(({ children, parents, ...parent }) => parent);
+      // node.parents = parents.map(({ props, propsSelf, ...parent }) => parent);
+  
+      // Recover frontmatter
+      // This removes the first child from array if it is a yaml code block
+      const firstChildIfFM = node.children[0]?.code?.language === "yaml" && node.children.shift();
+      const fmString = firstChildIfFM?.code?.rich_text?.[0]?.plain_text;
+      
+      // const fmMatch = raw.md.match(/^`{3}yaml([\w]*)\n([\S\s]+?)\n`{3}/);
+      // if (fmMatch?.[0]) node.md = node.md.replace(fmMatch[0], "");
+      // console.log(raw.md, "\n", node.md, "\n\n");
+      // const fmString = fmMatch?.[2];
+      const frontmatter = fmString ? jsYaml.load(fmString) : {};
+      // node.frontmatter = frontmatter;
+  
+      // Recover and transform Notion page properties
+      const propsArrayOfObjects =
+        (raw.properties &&
+          Object.entries(raw.properties).map(([key, val]) => {
+            // Transform page properties.
+            const prop = transformProp([key, val], node.role);
+            // Save files in our global 'allFiles' array
+            // if (val.type === "files" && !prop._definition) {
+            //   const commons = {
+            //     last_edited_time: raw.last_edited_time,
+            //     blockId: raw.id,
+            //   };
+            //   const _filesTemp = _get(prop, key, []);
+            //   // console.log({ _filesTemp, prop, key });
+            //   const filesTemp = _filesTemp.map((f) => ({ ...f, ...commons }));
+            //   // files.push(...filesTemp);
+            //   allFiles.push(...filesTemp);
+            // }
+            return prop;
+          })) ||
+        [];
+
+      // Recover MDX exports on Notion pages
+      
+
+      // const { code } = node.mdx;
+      // const {
+      //   default: _defaultExport,
+      //   frontmatter: _frontmatter, // is undefined since we don't parse it with this config
+      //   ...mdxExports
+      // } = getMDXExport(code) || {};
+  
+      // Merge Notion properties with frontmatter for that page.
+      // const { components: declaredExportedComponents, ...restMdxExports } = raw.mdxExports
+      let propsSelf = deepMergePropsSelf([
+        { title: node.codeName },
+        ...propsArrayOfObjects,
+        frontmatter || {},
+        // { components: restMdxExports },
+        raw.mdxExports || {},
+      ]);
+      
+      // take up the title of the parent by default. It is assumed that this is the homepage
+      if (propsSelf.title === "index") {
+        propsSelf.title = undefined;
+      }
+      node.propsSelf = propsSelf
+
+      // merge props from parents to current page
+      const parentsProps = parents?.map((p) => p?.propsSelf).filter((z) => z) || [];
+      const props = deepMergePropsAllPages([...parentsProps, propsSelf]);
+  
+      node.props = {
+        self: propsSelf,
+        // rawProperties: raw.properties,
+        ...props,
+      };
+    }
+
+    if (node.type === "page") {
+      // Slug and Path ONLY on non-hidden pages
+      if (!node.codeName.startsWith("_")) {
+        // Slug and Path
+        // NOTE: this path is only the last section, corresponding to the codeName of the page
+        const { slug, path } = slugifyPath(node.codeName);
+        node.slug = slug;
+
+        // REMARK: need to account for hidden pages
+        const closestParentPage = [...ancestors]
+          .reverse()
+          .find((n) => n.path);
+        node.path =
+          [closestParentPage?.path, path]
+            .filter((z) => z) // remove empty paths e.g. the 'index' page to avoid leading or double  '/'
+            .join("/") || undefined;
+
+        // Just to avoid confusion with path that has no leading '/'
+        node.props.href = "/" + (node.path ? node.path : '');
+
+        // Push page to flat list
+        pages.push(node);
+
+        //
+        // Save a MAP of all the pages with the Notion ID, Notion URLs and our local path
+        //
+        const pageId = node.id.replaceAll("-", "");
+        const pathMap = {
+          pageId,
+          pageIdHyphen: node.id,
+          // notionPath: `/${pageId}`,
+          // notionHyphenPath: `/${node.id}`,
+          // notionFullPath: `https://www.notion.so/${pageId}`,
+          path: node.path,
+          href: node.props.href,
+        };
+        allPaths.push(pathMap);
+      }
+      if (node.role === "collection") {
+        collections.push(node);
+      }
+    } else if (node.type === "root") {
+      settings = node;
+      // Everything else are blocks
+    } else {
+      if (node.role === "file") {
+        // const remoteUrl = node?.blockProps?.file?.url
+        const commons = {
+          last_edited_time: raw.last_edited_time,
+          blockId: raw.id,
+        };
+
+        const oType = raw.file?.type;
+        const originalUrl = oType && raw.file?.[oType]?.url;
+        const { filename, extension } = parseFileUrl(originalUrl);
+        const url = oType && `/${dirUserAssets}/${filename}`;
+
+        node.blockProps.file.url = url
+        node.blockProps.file.originalUrl = originalUrl
+        node.blockProps.file.filename = filename
+        node.blockProps.file.extension = extension
+        
+        const file = oType && {
+          ...commons,
+          // remoteUrl,
+          originalUrl,
+          filename,
+          extension,
+          url,
+        };
+
+        allFiles.push(file)
+      }
+
+
+      // look in the direct children of the root page (settings)
+      if (ancestors.length === 1) {
+        if (node.role === "code") {
+          if (node.blockProps.language === "css")
+            globalStylesString = node.inlinePlainText;
+          if (node.blockProps.language === "html")
+            headString = node.inlinePlainText;
+        }
+  
+      } else {
+        // Do thins on blocks inside pages (or )
+      }
+
+      blocks.push(node);
+
+    }
+    // else if (node.type === "block" && node.inline?.length) {
+    //   console.log(node)
+    // }
+
+  }); // END OF visitParents MAIN TRAVERSAL
+
+  await Promise.all(
+    blocks.map(async (block) => {
+      const rawType = block.raw.type
+      // Replace Notion URLs with local hrefs in rich text fields
+      if (block.richText?.length) {
+        for (const i of block.richText) {
+          if (i?.href && /\/[0-9a-z\-]{32}/.test(i.href)) {
+            const match = allPaths.find(pathMap => i.href.replaceAll("-", "").indexOf(pathMap.pageId) > -1)
+            if (match?.href) {
+              i.href = match.href
+              // NOTE: it also mutates block.raw[rawType].rich_text
+            }
+          }
+        }
+      }
+      // Replace Notion URLs with local hrefs in other block properties
+      // if (block.blockProps) {
+      //   console.log({ role: block.role, blockProps: block.blockProps});
+      // }
+        
+      const inlineMd = await notionBlockToMd(block.raw);
+      block.inlineMd = inlineMd
+      // console.log(block?.raw?.[rawType]?.rich_text)
+    })
+  );
+
+  await Promise.all(
+    pages.map(async (page) => {
+      const md = treeToMd(page.children?.map(c => ({ ...c, parent: c.inlineMd })));
+      page.md = md
+
+      const mdx = md
+        ? await bundleMDX({source: md, ...mdxConfig})
+        : { code: undefined };
+    })
+  );
+
+  // visitParents(
+  //   tree,
+  //   (node) => node.type === "page",
+  //   (node, ancestors) => {
+  //     // console.log(node.md);
+
+  //     // if (node.richText?.length) {
+  //     //   for (const i of node.richText) {
+  //     //     if (i?.href && /\/[0-9a-z\-]{32}/.test(i.href)) {
+  //     //       // console.log(node.richText);
+  //     //     }
+  //     //     if (i?.href?.startsWith('/')) {
+  //     //       // console.log(node.inlineMd);
+  //     //     }
+  //     //   }
+  //     // }
+  //   }
+  // )
+
+
+  let filesPrev = pokoPrev?.files || [];
+  // TODO: improve this. For example create a map of the downloads and the last modified date
+  allFiles = await Promise.all(
+    allFiles.map(async (_f) => {
+      // const f = await probeFile(_f);
+      const f = {
+        ...(await probeFile(_f)),
+        ...(await probeHeaders(_f)),
+      };
+      const { last_edited_time, blockId, url, length, etag, last_modified } = f;
+      const alreadyUp = !!filesPrev.find((filePrev) => {
+        return (
+          last_edited_time === filePrev.last_edited_time &&
+          blockId === filePrev.blockId &&
+          url === filePrev.url &&
+          length === filePrev.length &&
+          etag === filePrev.etag &&
+          last_modified === filePrev.last_modified
+        );
+      });
+
+      if (alreadyUp) {
+        console.info(`File ${f.filename} already up to date`);
+        return f;
+      }
+
+      // this downloads to public/
+      const systemFileUserAssets1 = `${systemDirUserAssets1}/${f.filename}`;
+      // this downloads to src/_data
+      // const systemFileUserAssets2 = `${systemDirUserAssets2}/${f.filename}`;
+
+      // console.log(`-----FILE: ${f.filename}`);
+
+      await downloadFile(f, systemFileUserAssets1);
+      // await copy(systemFileUserAssets1, systemFileUserAssets2);
+      if (f.extension === ".zip") {
+        await extractZip(f, systemFileUserAssets1);
+        // await extractZip(f, systemFileUserAssets2);
+      }
+
+      return f;
+    })
+  );
+
+  // Replace Notion URLs for local ones
+  // visitParents(
+  //   tree,
+  //   (node) => node.type === "block",
+  //   (node, ancestors) => {
+  //     if (!node.inline) return;
+  //     // INLINE BLOCKS: Replace notion links with local paths
+  //     node.inline.forEach((il, i) => {
+  //       const notionHref = il.href
+  //       if (notionHref) {
+  //         const pathMatch = allPaths.find((pathObj) => {
+  //           return (
+  //             pathObj.notionPath === notionHref ||
+  //             pathObj.notionHyphenPath === notionHref ||
+  //             pathObj.notionFullPath === notionHref
+  //             );
+  //           });
+  //         if (pathMatch) {
+  //           // const re = new RegExp(escapeRegExp(notionHref), "g");
+            
+  //           node.inline[i].href = pathMatch.href;
+  //           if (il.text?.link?.url) {
+  //             node.inline[i].text.link.url = pathMatch.href;
+  //           }
+  //           // TODO: May work to replace also in md and inlineMd but things to consider...
+  //           if (node.inlineMd) {
+  //             // console.log(node.inlineMd.match(re));
+  //             node.inlineMd = node.inlineMd.replaceAll(notionHref, pathMatch.href);
+  //           }
+  //           // if (node.data.inlineMd) {
+  //           //   console.log(node.data.inlineMd.match(re));
+  //           //   node.data.inlineMd = node.data.inlineMd.replaceAll(re, localPath);
+  //           // }
+  //           // // console.log(node.data.md);
+  //           // // console.log(node.data.inlineMd);
+
+  //           let closestParentPage
+  //           for (let j = ancestors.length - 1; j >= 0; j--) {
+  //             if (ancestors[j].type === "page") {
+  //               closestParentPage = ancestors[j]
+  //               j = 0
+  //             }
+  //           }
+            
+  //           if (closestParentPage) {
+  //             console.log(closestParentPage)
+  //             closestParentPage.md = closestParentPage?.md.replaceAll(notionHref, pathMatch.href)
+  //             // closestParentPage.mdx = closestParentPage?.mdx.replaceAll(notionHref, pathMatch.href)
+  //           }
+
+  //           // const parentPage = ancestors
+
+
+  //           // ancestors.forEach((n, i) => {
+  //           //   if (n.data.md) {
+  //           //     console.log(n.data.md.match(re));
+  //           //     ancestors[i].data.md = ancestors[i].data.md.replaceAll(
+  //           //       re,
+  //           //       localPath
+  //           //     );
+  //           //   }
+  //           //   if (n.data.inlineMd) {
+  //           //     console.log(n.data.inlineMd.match(re));
+  //           //     ancestors[i].data.inlineMd = ancestors[
+  //           //       i
+  //           //     ].data.inlineMd.replaceAll(re, localPath);
+  //           //   }
+  //           //   console.log(ancestors[i].data.md);
+  //           //   console.log(ancestors[i].data.inlineMd);
+  //           // });
+  //         }
+  //       }
+  //     });
+  //   }
+  // );
+
+
+  const poko = {
+    cache: { hash: contentHash },
+    settings,
+    pages,
+    collections,
+    files: allFiles,
+    paths: allPaths,
+    // websiteTree: tree,
+  };
+
+  const filePathData = "src/_data/poko.json";
+  const dir = filePathData.split("/").slice(0, -1).join("/");
+  const systemDir = `${process.cwd()}/${dir}`;
+  const systemPathData = `${process.cwd()}/${filePathData}`;
+
+  if (!existsSync(systemDir)) {
+    await fs.mkdir(systemDir);
+  } else if (existsSync(systemPathData)) {
+    await fs.rm(systemPathData);
+  }
+  await fs.writeFile(systemPathData, JSON.stringify(poko));
+
+  const staticPaths = pages.map((p) => {
+    // console.log(p.path, "\n");
+    return [
+      {
+        params: { path: p.path },
+        props: {
+          page: p,
+          // collections,
+          // settings,
+          globalStylesString,
+          headString,
+          tree,
+        },
+      },
+    ];
+  });
+
+  return staticPaths;
+}
+
+const { props } = Astro;
+
+const markdownRenderer =
+  props?.page?.props?.markdownRenderer?.toLowerCase() || "mdx";
+// const _jsonld = page?.props?.jsonld;
+// let jsonld = typeof _jsonld === "object" ? transformJsonld(_jsonld) : _jsonld;
+
+// const ldString = jsonld ? JSON.stringify(jsonld) : "";
+---
+
+<!-- <Debug {page} /> -->
+{markdownRenderer === "mdx" && <MDXPage {...props} />}
+<!-- {markdownRenderer === "handlebars" && <HandlebarsPage {...{ md }} />} -->
+
+<!-- {ldString ? <script type="application/ld+json" set:html={ldString} /> : null} -->

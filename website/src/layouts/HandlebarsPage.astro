@@ -1,0 +1,27 @@
+---
+// import Debug from 'astro/debug';
+// import { notionHelpers } from "@utils";
+import { SkeletonPage } from "@layouts";
+
+const { href, pathname } = new URL(Astro.url.pathname, Astro.site);
+
+import * as markdown from "markdown-wasm";
+import Handlebars from "handlebars";
+
+await markdown.ready;
+
+const { md } = Astro.props;
+
+// const parsed = markdown.parse("# hello\n*world*");
+const htmlhb = markdown.parse(md, { allowJSURIs: true });
+const template = Handlebars.compile(htmlhb);
+const html = template({ testVariable: "Nils" });
+---
+
+<SkeletonPage {...{ path: pathname,
+  //  ..._props, metadata, components
+   }}>
+  <!-- <Fragment slot="head" set:html={headString} /> -->
+
+  <div set:html={html}></div>
+</SkeletonPage>

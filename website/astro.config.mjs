@@ -5,12 +5,12 @@ import "dotenv/config";
 import sitemap from "@astrojs/sitemap";
 import robotsTxt from "astro-robots-txt";
 import mdx from "@astrojs/mdx";
-import react from "@astrojs/react";
+// import react from "@astrojs/react";
+import preact from "@astrojs/preact";
 import image from "@astrojs/image";
 
 // import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 // import mdx from "@mdx-js/rollup";
-// import preact from "@astrojs/preact";
 // import { astroImageTools } from "astro-imagetools";
 // import mdx from "@astrojs/mdx";
 // import image from "@astrojs/image";
@@ -33,8 +33,9 @@ export default defineConfig({
   integrations: [
     ...(site ? [sitemap(), robotsTxt()] : []),
     // mdx(),
+    preact({ compat: true }),
     // preact(),
-    react(),
+    // react(),
     image(),
     // fetchAhead(),
     // astroImageTools,
@@ -50,6 +51,6 @@ export default defineConfig({
     plugins: [
       // viteCommonjs(),
       // mdx(/* jsxImportSource: …, otherOptions… */)
-    ],
+  ],
   },
 });

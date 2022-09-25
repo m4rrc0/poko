@@ -1,3 +1,6 @@
+import { h } from 'preact'
+// import React from 'react'
+// import * as Preact from 'preact';
 // import React, { useState, useEffect } from "react";
 // import { getImage } from "@astrojs/image";
 
@@ -27,4 +30,19 @@ export const components = {
     ) : (
       <em>{cap ? "P" : "p"}oko</em>
     ),
+  // wrapper: ({ children, components, ...props }) => {
+  //   return null
+  //   return (
+  //   <>
+  //   <components.Menu {...{ components, ...props }} />
+  //   <components.main {...{ components, ...props }}>
+  //   <components.header {...{ components, ...props }} >
+  //   {props.title && <h1>{props.title}</h1>}
+  //   </components.header>
+  //   {children}
+  //   </components.main>
+  //   <components.footer />
+  //   </>
+  //   );
+  //   }
 };

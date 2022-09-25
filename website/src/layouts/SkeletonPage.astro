@@ -1,0 +1,148 @@
+---
+// import '../styles/global.css';
+
+// import SEO from '../components/SEO.astro'
+import { Anon } from '@components'
+
+const {
+  path,
+  html = {},
+  body = {},
+  head = {},
+  style = '',
+  headChildren: headChildrenRaw,
+  bodyChildren: bodyChildrenRaw,
+  metadata,
+  // components,
+} = Astro.props || {}
+const {
+    lang = 'en',
+    siteName,
+    title,
+    description,
+    canonicalUrl,
+    meta, // An array of objects with properties corresponding to <meta> attributes
+    link, // An array of objects with properties corresponding to <link> attributes
+    ...restMetadata
+  } = metadata || {}
+
+// Transform something like
+// const obj = { ogType: {tag: 'meta', property: "og:type", content: 'website'} }
+// to
+// const arr = [ {'data-key': 'ogType', tag: 'meta', property: "og:type", content: 'website'} ]
+// MUST have a 'tag' prop
+const mapObjectToArray = (obj, varName) => {
+  if (typeof obj === 'undefined') return obj
+  
+  let arr = undefined;
+  if (Array.isArray(obj)) {
+    arr = obj
+  } else if (typeof obj === 'object') {
+    arr = Object
+      .entries(obj)
+      .map(([key, val]) => {
+        if (typeof val === 'object') {
+          return { ['data-key']: key, ...val }
+        }
+        return val
+      })
+  } else {
+    console.error(
+      `Error in exports ${varName} on page ${path}.\n`,
+      `${JSON.stringify(obj)} is not an array or object.`)
+    
+    return obj
+  }
+  arr = arr.map(el => {
+      if (typeof el === 'object' && !el?.tag) {
+        console.error(`Exported element with key '${el['data-key']}' has no 'tag' property`)
+        return null
+      }
+      return el
+    }).filter(o => o)
+
+  return arr
+}
+
+const titleComposed = title ? `${title}${siteName ? ` | ${siteName}` : ''}` : siteName
+const restTags = mapObjectToArray(restMetadata, 'restMetadata')
+const headChildren = mapObjectToArray(headChildrenRaw, 'headChildrenRaw')
+const bodyChildren = mapObjectToArray(bodyChildrenRaw, 'bodyChildrenRaw')
+
+// "metadata": {
+//       "title": "This blog is monumental",
+//       "ogType": {
+//         "tag": "meta",
+//         "property": "og:type",
+//         "content": "website"
+//       },
+//       "link": [
+//         {
+//           "rel": "canonical",
+//           "href": "https://www.poko.site/blog"
+//         },
+//         {
+//           "rel": "icon",
+//           "type": "image/png",
+//           "sizes": "32x32",
+//           "href": "/favicon.png"
+//         }
+//       ]
+//     }
+
+---
+
+<html {lang} {...html}>
+  <head {...head}>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1" />
+
+    {titleComposed && 
+      <title>{titleComposed}</title>
+      <meta property="og:title" content={titleComposed} />}
+    
+    {description && 
+      <meta name="description" content={description} />
+      <meta property="og:description" content={description} />}
+
+    {canonicalUrl &&
+      <link rel="canonical" href={canonicalUrl} />
+      <meta property="og:url" content={canonicalUrl} />}
+
+    {Array.isArray(meta) && meta.map(el => (
+      <meta {...el} />
+    ))}
+
+    {Array.isArray(link) && link.map(el => (
+      <link {...el} />
+    ))}
+
+    {Array.isArray(restTags) && restTags.length > 0 && restTags.map(({children, ...el}) => (
+      <Anon {...el} >{children}</Anon>
+    ))}
+
+    {Array.isArray(headChildren) && headChildren.length > 0 && headChildren.map(({children, ...el}) => (
+      <Anon {...el}>{children}</Anon>
+    ))}
+
+    <slot name="head" />
+    
+    <!-- Important to put user-css after head insert because we could import css libraries and need to overwrite them -->
+    <link rel="stylesheet" href="/user-styles.css" />
+
+    <Fragment set:html={`<style class="style-page" type="text/css">${style}</style>`} />
+
+  </head>
+
+  <body {...body}>
+    <slot />
+    <slot name="body"/>
+
+    {Array.isArray(bodyChildren) && bodyChildren.length > 0 && bodyChildren.map(El => typeof El === 'object' ? (
+      <Anon {...El} >{El.children}</Anon>
+    ) : <El />)}
+
+    <!-- <script src="/assets/js/instant.page.js" defer type="module"></script> -->
+  </body>
+</html>
+

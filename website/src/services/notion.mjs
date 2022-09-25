@@ -3,7 +3,28 @@ import "dotenv/config";
 import { NotionToMarkdown } from "notion-to-md";
 import { getImage, getPicture } from "@astrojs/image";
 import probeImageSize from "probe-image-size";
+import _set from "lodash.set";
+// import { VFile } from "vfile";
+// import * as preactRuntime from "preact/jsx-runtime";
+// If we want to use Svelte, we might use the jsx-runtime from https://github.com/kenoxa/svelte-jsx/blob/main/src/jsx-runtime.js
+// To use with React, apparently we need this
+// import * as rt from "../../node_modules/react/jsx-runtime.js";
+// const runtime = { default: { Fragment: Symbol(react.fragment), jsx: [Function: jsxWithValidationDynamic], jsxs: [Function: jsxWithValidationStatic] }, [Symbol(Symbol.toStringTag)]: 'Module' }
+// import { compile, evaluate } from "@mdx-js/mdx";
+// import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
+// import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+// import remarkUnwrapImages from "remark-unwrap-images";
+// import remarkGfm from "remark-gfm";
+// import rehypeSlug from "rehype-slug";
 
+// import { parseFileUrl } from "@utils/index.mjs";
+
+// NOTE: for some reason `preact/jsx-runtime`does not yield the same export on `dev` ad `build` commands
+// const runtime = preactRuntime.default || preactRuntime;
+
+// import { compile as mdxCompile } from "@mdx-js/mdx";
+
+/// --- INITIALIZE --- ///
 const NOTION_TOKEN = import.meta.env.NOTION_TOKEN;
 const NOTION_ROOT_ID = import.meta.env.NOTION_ROOT_ID;
 // Initializing notion client
@@ -13,6 +34,7 @@ const notion = new Client({ auth: NOTION_TOKEN });
 const n2m = new NotionToMarkdown({ notionClient: notion });
 
 n2m.setCustomTransformer("image", async (block) => {
+  // console.log(block)
   const { image } = block;
   if (image.type !== "file") return null;
 
@@ -30,7 +52,9 @@ n2m.setCustomTransformer("image", async (block) => {
     type,
     /* mime,wUnits,hUnits,length,url */
   } = await probeImageSize(originalUrl);
-  console.log({ type });
+
+  // console.log({ type });
+
   const i = await getImage({
     src: originalUrl,
     format: type,
@@ -38,7 +62,9 @@ n2m.setCustomTransformer("image", async (block) => {
     height,
     alt,
   });
-  console.log({ i });
+
+  // console.log({ i });
+
   // const p = await getPicture({
   //   src: originalUrl,
   //   formats: [type, "webp", "avif"],
@@ -56,17 +82,17 @@ n2m.setCustomTransformer("image", async (block) => {
 });
 
 n2m.setCustomTransformer("toggle", async (block) => {
-  return "";
-  // const { toggle } = block;
-  // // console.log(toggle);
-  // let toggle_text = "";
-  // toggle.rich_text.forEach((rich_text) => {
-  //   toggle_text += n2m.annotatePlainText(
-  //     rich_text.plain_text,
-  //     rich_text.annotations
-  //   );
-  // });
-  // return toggle_text;
+  const { toggle } = block;
+  // console.log(toggle);
+  // return "";
+  let toggle_text = "";
+  toggle.rich_text.forEach((rich_text) => {
+    toggle_text += n2m.annotatePlainText(
+      rich_text.plain_text,
+      rich_text.annotations
+    );
+  });
+  return toggle_text;
 });
 
 n2m.setCustomTransformer("child_page", async (block) => {
@@ -100,7 +126,7 @@ export async function getAllNotionPages() {
   return _pages;
 }
 
-async function getBlockChildren(block_id = NOTION_ROOT_ID) {
+export async function getBlockChildren(block_id = NOTION_ROOT_ID) {
   let blocks = [];
   let start_cursor;
   let has_more = true;
@@ -155,13 +181,14 @@ export async function getBlockChildrenRecursively(
     _blocks.map(async (_block) => {
       let block = _block;
 
-      if (block.object !== "page") {
-        const _inlineMd = await notionBlockToMd(_block);
-        const _mayHaveNotionLink = !!_inlineMd.match(/\/[0-9a-z\-]{32}/);
-        block = { ..._block, _inlineMd, parent: _inlineMd, _mayHaveNotionLink };
-      }
+      // compute inlineMd and look into md to check for possible notion id
+      // if (block.object !== "page") {
+      //   const inlineMd = await notionBlockToMd(_block);
+      //   const _mayHaveNotionLink = !!inlineMd?.match(/\/[0-9a-z\-]{32}/);
+      //   block = { ..._block, inlineMd, parent: inlineMd, _mayHaveNotionLink };
+      // }
 
-      //   let blockId;
+      // let blockId;
       let children;
       const syncedBlockId = block?.synced_block?.synced_from?.block_id;
       const linkToPageId =
@@ -192,14 +219,14 @@ export async function getBlockChildrenRecursively(
               return p._codeName === childPageTitle;
             })
             .filter((p) => {
-              return p._parentId === currentPageId;
+              return p.parentId === currentPageId;
             });
 
           let subChildren = [];
           if (pages[0].object === "database") {
             // TODO: might be an inline DB or just a subPage...
             subChildren = allPages.filter((p) => {
-              return p._parentId === pages[0].id;
+              return p.parentId === pages[0].id;
             });
           } else {
             subChildren = await getBlockChildrenRecursively(
@@ -225,7 +252,7 @@ export async function getBlockChildrenRecursively(
       //   const _children = await getBlockChildren(block.id);
       //   const children = await getBlockChildrenRecursively(_children);
 
-      return { ...block, _parentPageId: currentPageId, children };
+      return { ...block, parentPageId: currentPageId, children };
     })
   );
 
@@ -236,54 +263,6 @@ export async function getBlockChildrenRecursively(
   return blocks;
 
   //   return { blocksCopy: bc, blocks: blocksPopulated };
-}
-
-export function populateChildPageOfBlock(_block, allRawPages) {
-  let block = _block;
-  let children = _block.children;
-
-  const linkToPageId =
-    _block?.link_to_page?.page_id || _block?.link_to_page?.database_id;
-  const childPageTitle =
-    _block?.child_page?.title || _block?.child_database?.title;
-
-  if (linkToPageId && !children?.length) {
-    // Only place page data, not children recursively
-    const pageAndChildren = allRawPages.find((p) => p.id === linkToPageId);
-    // console.log(`Injecting page with linkToPage ${pageAndChildren._codeName}`);
-
-    const { children: _, ...page } = pageAndChildren;
-    children = [page];
-  } else if (childPageTitle && !children?.length) {
-    // A 'child_page' _block
-    const childPage = allRawPages
-      .filter((p) => {
-        return p._codeName === childPageTitle;
-      })
-      .filter((p) => {
-        return p._parentId === _block._parentPageId;
-      })[0];
-
-    // console.log(`Injecting page with childPage ${childPage._codeName}`);
-
-    let subChildren;
-    if (childPage.object === "database") {
-      // TODO: might be an inline DB or just a subPage...
-      subChildren = allRawPages.filter((p) => {
-        if (p._parentId === childPage.id) {
-          // console.log(`Injecting page in DB ${childPage._codeName}`);
-        }
-        return p._parentId === childPage.id;
-      });
-    }
-
-    const page = {
-      ...childPage,
-      children: subChildren || childPage.children,
-    };
-    children = [page];
-  }
-  return children;
 }
 
 // --- NOTION TO MD --- //
@@ -353,7 +332,6 @@ export async function notionBlockToMd(block) {
 export function treeToMd(blocks) {
   // if (!blocks || !Array.isArray(blocks.children)) return undefined;
   const mdString = n2m
-    // .toMarkdownString(mdBlocks)
     .toMarkdownString(blocks)
     .trim() // trim() to remove leading (and trailing) "\n" to allow top level frontmatter
     .replace(/‘/g, "'")
@@ -365,6 +343,208 @@ export function treeToMd(blocks) {
     .replace(/—/g, "-");
   // console.log({ mdString });
   return mdString;
+}
+
+// export async function toMdx(mdString, debugString) {
+//   let MDXContent = undefined;
+//   let exports = undefined;
+
+//   try {
+//     // const { default: MDXContentIn, ...exportsIn } = await compile(
+//     const { default: MDXContentIn, exports: exportsIn } = await evaluate(
+//       //   new VFile({ path: "path/to/file.mdx", value: mdString }),
+//       String(mdString),
+//       {
+//         // ...runtime,
+//         remarkPlugins: [
+//           [
+//             remarkFrontmatter,
+//             {
+//               type: "yaml",
+//               fence: { open: "```yaml", close: "```" },
+//               anywhere: true,
+//             },
+//           ],
+//           [remarkMdxFrontmatter, { name: "exports" }],
+//           // remarkUnwrapImages,
+//           remarkGfm,
+//         ],
+//         rehypePlugins: [rehypeSlug],
+//       }
+//     );
+//     MDXContent = MDXContentIn;
+//     exports = exportsIn;
+//   } catch (error) {
+//     // console.error(
+//     //   `Error evaluating with MDX: ${debugString || `\n${mdString}`}`
+//     // );
+//     // console.info(`Page info:\n`, { slug, path, mdString });
+//     console.error(error);
+//     const matches = mdString.match(/.*\n/g);
+//     console.log(
+//       "The error is here:\n",
+//       matches.slice(error.line - 6, error.line + 4).join("")
+//     );
+//     throw error;
+//   }
+
+//   return { MDXContent, exports };
+// }
+
+// --- TRANSFORM --- //
+
+export function populateChildPageOfBlock(_block, allRawPages) {
+  let block = _block;
+  let children = _block.children;
+
+  const linkToPageId =
+    _block?.link_to_page?.page_id || _block?.link_to_page?.database_id;
+  const childPageTitle =
+    _block?.child_page?.title || _block?.child_database?.title;
+
+  if (linkToPageId && !children?.length) {
+    // Only place page data, not children recursively
+    const pageAndChildren = allRawPages.find((p) => p.id === linkToPageId);
+    // console.log(`Injecting page with linkToPage ${pageAndChildren._codeName}`);
+
+    const { children: _, ...page } = pageAndChildren;
+    children = [page];
+  } else if (childPageTitle && !children?.length) {
+    // A 'child_page' _block
+    const childPage = allRawPages
+      .filter((p) => {
+        return p.codeName === childPageTitle;
+      })
+      .filter((p) => {
+        return p.parentId === _block.parentPageId;
+      })[0];
+
+    // console.log(`Injecting page with childPage ${childPage._codeName}`);
+
+    let subChildren;
+    if (childPage?.object === "database") {
+      // TODO: might be an inline DB or just a subPage...
+      subChildren = allRawPages.filter((p) => {
+        if (p.parentId === childPage.id) {
+          // console.log(`Injecting page in DB ${childPage._codeName}`);
+        }
+        return p.parentId === childPage.id;
+      });
+    }
+
+    const page = {
+      ...childPage,
+      children: subChildren || childPage.children,
+    };
+    children = [page];
+  }
+  return children;
+}
+
+export function transformRawPage(p) {
+  const _parentType = p?.parent?.type;
+  // The title of a Pages is always 'Title'. For a collection item it can be anything but then the property has a type of 'title'
+  let _titlePropName = "title";
+  if (_parentType === "database_id") {
+    // A collection item
+    Object.entries(p?.properties).forEach(([propName, propVal]) => {
+      if (propVal.type === "title") _titlePropName = propName;
+    });
+  }
+  const _title =
+    p?.title || // database
+    p?.properties?.title?.title || // page
+    p?.properties?.[_titlePropName]?.title; // collection item
+
+  const codeName = _title?.map(({ plain_text }) => plain_text).join("");
+  const parentId = p.parent[_parentType];
+
+  return codeName
+    ? {
+        ...p,
+        _title,
+        codeName,
+        _titlePropName,
+        parentId,
+        // _props,
+      }
+    : null; // pages are created automatically in DBs. If no title, we don't want them
+}
+
+export function transformRichTextToPlainText(_val) {
+  if (typeof _val === "string") return _val;
+  if (Array.isArray(_val))
+    return _val.map(({ plain_text }) => plain_text).join("");
+  // Can be object if value is empty
+  if ((typeof _val).match(/undefined|object/)) return undefined;
+
+  return _val;
+}
+
+export function transformProp([_key, _val] = [], role) {
+  let key = _key;
+  // name === _key
+  // not sure id is useful
+  // type tells us where to find the actual value
+  const { id, name, type } = _val;
+  let val = _val[type];
+
+  if (role === "collection") {
+    key = `_definition.${_key}`;
+    val = _val;
+  } else if (type === "title" || type === "rich_text") {
+    // title can be a string or a rich_text field
+    // console.log({ type, key, val });
+    // console.dir(val, { depth: null });
+
+    val = transformRichTextToPlainText(val);
+  } else if (type === "multi_select" && Array.isArray(val.options)) {
+    val = val.options.map(({ name }) => name);
+  } else if (type === "select") {
+    val = val?.name;
+  } else if (type === "files") {
+    // console.log(val)
+    // TODO: handle files in properties
+    // val = val.map((f) => {
+    //   const {
+    //     /*name, type, */ file: { url: originalUrl },
+    //   } = f;
+    //   const { filename, extension } = parseFileUrl(originalUrl);
+    //   const url = `/${dirUserAssets}/${filename}`;
+    //   // if (key.match("jsonld")) {
+    //   //   return url;
+    //   // }
+    //   return { originalUrl, filename, extension, url };
+    // });
+  } else if (type === "date") {
+    // if (val?.start && !val?.end && !val?.time_zone) {
+    //   val = val?.start;
+    // }
+  } else if (type === "relation") {
+    // console.log({ type, key, _val, val });
+    // TODO: transform link OR have the page data in directly?
+  } else if (type) {
+    // TODO: handle more types
+    // val = _val[type];
+    //
+  }
+
+  // ?? TODO: map notion prop types to own types???
+  // All props types: "title", "rich_text", "number", "select", "multi_select", "date", "people", "files", "checkbox", "url", "email", "phone_number", "formula", "relation", "rollup", "created_time", "created_by", "last_edited_time", "last_edited_by",
+
+  if (key.match(/\./)) {
+    let obj = {};
+    _set(obj, key, val);
+    return obj;
+  }
+
+  return { [key]: val };
+}
+
+// --- UTILS --- //
+
+export function rootId() {
+  return NOTION_ROOT_ID;
 }
 
 // const probeFile = async (fileObject) => {
@@ -394,3 +574,40 @@ export function treeToMd(blocks) {
 //     return fileObject;
 //   }
 // };
+
+// --- DICTIONARIES --- //
+
+export const dicoNotionBlockTypes = {
+  paragraph: "p",
+  heading_1: "h1",
+  heading_2: "h2",
+  heading_3: "h3",
+  bulleted_list_item: "ul",
+  numbered_list_item: "ol",
+  code: "code",
+  to_do: "todo",
+  toggle: "toggle",
+  child_page: "page",
+  child_database: "collection",
+  embed: "embed",
+  image: "img",
+  video: "video",
+  file: "file",
+  pdf: "pdf",
+  bookmark: "bookmark",
+  callout: "callout",
+  quote: "blockquote",
+  equation: "equation",
+  divider: "hr",
+  table_of_contents: "toc",
+  column_list: "columns",
+  column: "column",
+  link_preview: "a",
+  synced_block: "skip",
+  template: "none",
+  link_to_page: "link",
+  table: "table",
+  table_row: "tr",
+  // "cell": "td", // not that way in API but makes little sense to me to not have cells as children
+  unsupported: "none",
+};
