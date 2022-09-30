@@ -16,6 +16,7 @@ import remarkGfm from "remark-gfm";
 
 const mdxConfig = {
   mdxOptions(options, frontmatter) {
+    options.jsxImportSource = 'preact'
     options.remarkPlugins = [
       ...(options.remarkPlugins ?? []),
       // [
@@ -46,18 +47,20 @@ const mdxConfig = {
   // function Demo() {return <div>Neat demo!</div>}
   // export default Demo`},
 }
-
-const { href, pathname } = new URL(Astro.url.pathname, Astro.site);
-const { page, tree, globalStylesString, headString } =
+const { href: canonicalUrl, pathname } = new URL(Astro.url.pathname, Astro.site);
+const { page, pages, tree, globalStylesString, headString } =
   Astro.props;
 
-const { md, props } = page;
+    const { md, props } = page;
 
-const mdx = md
-  ? await bundleMDX({source: md, ...mdxConfig})
-  : { code: undefined };
+// const mdx = md
+//   ? await bundleMDX({source: md, ...mdxConfig})
+//   : { code: undefined };
+const mdx = await bundleMDX({source: md, ...mdxConfig})
 
 const { code } = mdx
+
+const dataForComponents = { pages, pathname, canonicalUrl }
 
 // console.log(props.components)
 
@@ -66,5 +69,6 @@ const { code } = mdx
 <SkeletonPage {...{ path: pathname, ...props}}>
   <Fragment slot="head" set:html={headString} />
 
-  {code ? <MDXBundler {...{ code, frontmatter: undefined, props }} /> : null}
+  <!-- {code ? <MDXBundler {...{ code, frontmatter: undefined, props, dataForComponents }} /> : null} -->
+  <MDXBundler {...{ code, frontmatter: undefined, props, dataForComponents }} />
 </SkeletonPage>

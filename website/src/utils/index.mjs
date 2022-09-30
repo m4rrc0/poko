@@ -64,23 +64,23 @@ export const deepMergePropsSelf = (arrOfPropsObj) => {
   // };
 };
 
-export const deepMergePropsAllPages = (_arrOfPropsObj) => {
-  if (!Array.isArray(_arrOfPropsObj)) {
+export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
+  if (!Array.isArray(_arrOfAncestorsProps)) {
     throw "Trying to merge array of props but not an array";
   }
-  if (_arrOfPropsObj.length === 0) {
+  if (_arrOfAncestorsProps.length === 0) {
     console.error("You are trying to merge props from an empty array");
     return {};
   }
-  if (_arrOfPropsObj.length === 1) {
+  if (_arrOfAncestorsProps.length === 1) {
     // These are only the settings
-    return deepmerge.all(_arrOfPropsObj);
+    return deepmerge.all(_arrOfAncestorsProps);
   }
 
   let prev_children = undefined;
-  // TODO: merge _self into props BUT remove what were passe from parents' _self ??
+  // TODO: merge _self into props BUT remove what were passed from parents' _self ??
   // let prev_self = undefined;
-  const arrOfPropsObj = _arrOfPropsObj
+  const arrOfPropsObj = _arrOfAncestorsProps
     // .filter((p) => p.title) // remove non-pages from the list
     .map((propsObj, i, arr) => {
       const isSettings = i === 0;
@@ -90,6 +90,7 @@ export const deepMergePropsAllPages = (_arrOfPropsObj) => {
         raw,
         self,
         _self,
+        _page,
         _children,
         title,
         // href,
@@ -107,6 +108,7 @@ export const deepMergePropsAllPages = (_arrOfPropsObj) => {
         isSelf && raw ? { raw } : {},
         isSelf && self ? { self } : {},
         isSelf && _self ? { _self } : {},
+        isSelf && _page ? { _page } : {},
         isSelf && _children ? { _children } : {},
         // isSelf && href ? { href } : {},
         // isSelf && title ? { title } : {},
@@ -114,8 +116,6 @@ export const deepMergePropsAllPages = (_arrOfPropsObj) => {
         title ? { title } : {},
         restProps,
       ]);
-
-      prev_children = _children;
 
       const possibleComponentsAdded = Object.entries(currentProps).reduce(
         (prev, [key, val]) => {
@@ -127,9 +127,13 @@ export const deepMergePropsAllPages = (_arrOfPropsObj) => {
           const next = isFunction || hasCompName ? { [key]: val } : {};
           return { ...prev, ...next };
         },
-        { ...(currentProps?.components || {}) },
-        { ...components }
+        {
+          ...(currentProps?.components || {}),
+          ...components
+        }
       );
+
+      prev_children = _children;
 
       return { ...currentProps, components: possibleComponentsAdded };
     });

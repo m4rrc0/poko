@@ -1,6 +1,6 @@
 {
   "name": "@m4rrc0/poko",
-  "description": "A free open source website builder based on popular services",
+  "description": "A free open source website builder based on popular services like notion",
   "workspaces": [
     "website",
     "services/*",
@@ -23,5 +23,9 @@
     "dev:watch": "npm run dev:watch --workspace=website"
   },
   "author": "m4rrc0",
-  "license": "AGPL-3.0-or-later"
+  "license": "AGPL-3.0-or-later",
+  "devDependencies": {
+    "prettier": "^2.7.1",
+    "prettier-plugin-astro": "^0.5.5"
+  }
 }

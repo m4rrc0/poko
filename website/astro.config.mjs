@@ -36,7 +36,11 @@ export default defineConfig({
     preact({ compat: true }),
     // preact(),
     // react(),
-    image(),
+    // image(),
+    image({
+      // logLevel: "debug",
+      serviceEntryPoint: '@astrojs/image/sharp', // useful after version 0.8.0 of @astrojs/image
+    }),
     // fetchAhead(),
     // astroImageTools,
     // mdx(),

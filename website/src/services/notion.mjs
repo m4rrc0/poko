@@ -1,5 +1,5 @@
 import { Client } from "@notionhq/client";
-import "dotenv/config";
+// import "dotenv/config";
 import { NotionToMarkdown } from "notion-to-md";
 import { getImage, getPicture } from "@astrojs/image";
 import probeImageSize from "probe-image-size";
@@ -57,10 +57,13 @@ n2m.setCustomTransformer("image", async (block) => {
 
   const i = await getImage({
     src: originalUrl,
+    alt,
     format: type,
     width,
     height,
-    alt,
+    // quality: 90,
+    // aspectRatio: width / height,
+    // width: width > 2000 ? 2000 : width,
   });
 
   // console.log({ i });
@@ -81,25 +84,33 @@ n2m.setCustomTransformer("image", async (block) => {
   return `<img src="${i.src}" alt="${i.alt}" width="${i.width}" height="${i.height}" />`;
 });
 
-n2m.setCustomTransformer("toggle", async (block) => {
-  const { toggle } = block;
-  // console.log(toggle);
-  // return "";
-  let toggle_text = "";
-  toggle.rich_text.forEach((rich_text) => {
-    toggle_text += n2m.annotatePlainText(
-      rich_text.plain_text,
-      rich_text.annotations
-    );
-  });
-  return toggle_text;
-});
-
 n2m.setCustomTransformer("child_page", async (block) => {
   const { child_page } = block;
   // console.log(block);
+  //   inlineMd = `<ChildPage blockId="${block.id}" pageName="${block.child_page?.title}" />`;
   return `<ChildPage block={${JSON.stringify(block)}} />`;
 });
+
+n2m.setCustomTransformer("child_database", async (block, ...rest) => {
+  const { child_database } = block;
+  // TODO: HERE
+  return `<Collection block={${JSON.stringify(block)}} blockId="${block.id}" collectionName="${block.child_database?.title}" />`;
+  // return `<ChildPage block={${JSON.stringify(block)}} />`;
+});
+
+// n2m.setCustomTransformer("toggle", async (block) => {
+//   const { toggle } = block;
+//   // console.log(toggle);
+//   // return "";
+//   let toggle_text = "";
+//   toggle.rich_text.forEach((rich_text) => {
+//     toggle_text += n2m.annotatePlainText(
+//       rich_text.plain_text,
+//       rich_text.annotations
+//     );
+//   });
+//   return toggle_text;
+// });
 
 // --- FETCH --- //
 
@@ -457,7 +468,7 @@ export function transformRawPage(p) {
     p?.properties?.[_titlePropName]?.title; // collection item
 
   const codeName = _title?.map(({ plain_text }) => plain_text).join("");
-  const parentId = p.parent[_parentType];
+  const parentId = _parentType === 'workspace' ? null : p.parent[_parentType];
 
   return codeName
     ? {
@@ -481,7 +492,32 @@ export function transformRichTextToPlainText(_val) {
   return _val;
 }
 
+export const stringToVarName = _str => {
+  const a =
+    "àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìıİłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/-,:;";
+  const b =
+    "aaaaaaaaaacccddeeeeeeeegghiiiiiiiilmnnnnoooooooooprrsssssttuuuuuuuuuwxyyzzz______";
+  const p = new RegExp(a.split("").join("|"), "g");
+
+  const str = _str
+    .toString()
+    // .toLowerCase()
+    .replace(/\s+/g, "_") // Replace spaces with _
+    .replace(p, (c) => b.charAt(a.indexOf(c))) // Replace special characters
+    .replace(/&/g, "-and-") // Replace & with 'and'
+    .replace(/[^\w.]+/g, "") // Remove all non-word characters except "." [^\w.]
+    .replace(/\_\_+/g, "_") // Replace multiple _ with single _
+    .replace(/^_+/, "") // Trim _ from start of text
+    .replace(/_+$/, ""); // Trim _ from end of text
+
+  if (_str !== str) {
+    console.warn(`WARNING: Your property name "${_str}" has been replaced by "${str}"`)
+  }
+  return str
+}
+
 export function transformProp([_key, _val] = [], role) {
+  // let key = stringToVarName(_key);
   let key = _key;
   // name === _key
   // not sure id is useful
@@ -523,6 +559,9 @@ export function transformProp([_key, _val] = [], role) {
   } else if (type === "relation") {
     // console.log({ type, key, _val, val });
     // TODO: transform link OR have the page data in directly?
+  } else if (type === "formula") {
+    const formulaType = val.type
+    val = val[formulaType]
   } else if (type) {
     // TODO: handle more types
     // val = _val[type];

@@ -49,6 +49,9 @@ export const addProps = (components, defaultProps) => {
   for (const [key, Component] of Object.entries(components)) {
     if (typeof Component === "function") {
       withProps[key] = (props) => <Component {...defaultProps} {...props} />;
+    } else if (typeof Component === 'string' && /^[A-Z]/.test(Component) && !!components[Component]) {
+      const Comp = components[Component]
+      withProps[key] = (props) => <Comp {...defaultProps} {...props} />;
     } else {
       withProps[key] = Component;
     }
@@ -67,19 +70,12 @@ export const addProps = (components, defaultProps) => {
 const ImgLazy = ({
   children,
   components,
-  url, // in case we pass it a fileObject
-  src: _src, // in case it is generated from md and passed an src automatically
-  alt = "",
-  // poko: { files },
   image,
   ...props
 }) => {
-  // console.log({ props })
-  // const file = files.find((f) => f.url === (_src || url));
-  // const { width, height } = file || {};
-  // const src = file?.src || _src || url;
-  // console.log({ file, src, url, _src });
-  const { src, width, height } = image
+  // console.log(image)
+  const { src, alt = '', width, height } = image
+
   return (
     <div {...{ class: "img-lazy-wrapper" }}>
       <img
@@ -155,12 +151,12 @@ const CollectionWrapper = ({ children, ...props }) => (
     <div>{children}</div>
   </div>
 );
-const CollectionArticle = ({ id, children }) => {
+const CollectionArticle = ({ item, children }) => {
   return (
     <components.article
       {...{
         article: {
-          ["data-id"]: id,
+          ["data-id"]: item.id,
           // class: "box shadowy",
           class:
             "box no-border stack split-after-1 card-shadow breakout-clickable",
@@ -175,12 +171,11 @@ const CollectionArticle = ({ id, children }) => {
 };
 const CollectionArticleFeaturedImage = ({
   components,
-  poko,
   featuredImage,
 }) => {
   // console.log({ featuredImage });
   const fi = featuredImage?.[0] || featuredImage;
-  return fi ? <components.ImgLazy {...{ poko, ...fi }} /> : null;
+  return fi ? <components.ImgLazy {...{ components, image: fi?.image }} /> : null;
 };
 const CollectionArticleHeading = ({ components, href, heading }) => {
   return href && heading ? (
@@ -214,6 +209,37 @@ const CollectionArticleFooter = ({ components, datePublished, author }) => {
 //   // console.log(props);
 //   return <div>{md}</div>;
 // };
+
+const HeaderBlog = ({ components, poko, ...props }) => {
+  const ld = props.jsonld || {};
+  const featuredImage = props.featuredImage || ld.image?.[0] || ld.image;
+  const author = props.author || ld.author?.name;
+  const datePublished = props.datePublished || ld.datePublished?.start
+
+  // console.log({ featuredImage })
+  
+  return (
+    <header class="stack" style="--gap: 1rem;">
+      {featuredImage ? (
+        <components.ImgLazy {...{ components, ...featuredImage }} />
+      ) : null}
+      {datePublished || author ? (
+        <div class="cluster">
+          <div style="--gap: 1ch;">
+            {datePublished ? (
+              <components.p>
+                On <time datetime={datePublished}>{datePublished}</time>
+              </components.p>
+             ) : null}
+            {author ? <components.p>by {author}</components.p> : null}
+          </div>
+        </div>
+      ) : null}
+      {props.title && <h1>{props.title}</h1>}
+      <hr />
+    </header>
+  );
+}
 
 const components = {
   // --- EXAMPLES FROM DOCS --- //
@@ -286,104 +312,23 @@ const components = {
   //     </>
   //   );
   // },
-  // wrapper: ({ children, components, poko, ...props }) => {
-  //   const {
-  //     title,
-  //     description,
-  //     jsonld,
-  //     featuredImage,
-  //     gallery,
-  //     price,
-  //     _definition,
-  //     Astro,
-  //   } = props || {};
-  //   const ID = props.id || props.ID || props.sku || props.title;
-  //   const titleConcat = props.titleConcat?.string;
-  //   const ld = jsonld || {};
-  //   const fi =
-  //     featuredImage?.[0] || featuredImage || ld?.image?.[0] || ld?.image;
-
-  //   const priceSymbol =
-  //     _definition?.price?.number?.format === "euro" ? "€" : "?";
-
-  //   const canonicalUrl = new URL(Astro.url.pathname, Astro.site);
-
-  //   return (
-  //     <>
-  //       <components.Menu {...{ components, ...props }} />
-  //       <components.main {...{ components, ...props }}>
-  //         {titleConcat && (
-  //           <div
-  //             class="with-sidebar right"
-  //             style="--side-width: 25rem; --content-min: 30%;"
-  //           >
-  //             <div>
-  //               <div class="stack">
-  //                 {fi ? <components.ImgLazy {...{ poko, ...fi }} /> : null}
-  //                 {gallery?.[0] && (
-  //                   <div class="grid" style="--width-column: 4rem;">
-  //                     <div>
-  //                       {gallery.map((i) => (
-  //                         <components.ImgLazy
-  //                           {...{
-  //                             poko,
-  //                             ...i,
-  //                             // img: { style: `max-width: 10rem;` },
-  //                           }}
-  //                         />
-  //                       ))}
-  //                     </div>
-  //                   </div>
-  //                 )}
-  //               </div>
-  //               <div>
-  //                 <components.header {...{ components, ...props }}>
-  //                   {titleConcat && <h1>{titleConcat}</h1>}
-  //                 </components.header>
-  //                 {price && (
-  //                   <div class="cluster">
-  //                     <div>
-  //                       <p style="font-size: 1.17rem;">
-  //                         {price}
-  //                         {priceSymbol}
-  //                       </p>
-  //                       <button
-  //                         class="snipcart-add-item"
-  //                         data-item-name={titleConcat}
-  //                         data-item-id={ID}
-  //                         data-item-price={price}
-  //                         data-item-description={description}
-  //                         data-item-image={fi.url}
-  //                         data-item-url={canonicalUrl.href}
-  //                         data-item-has-taxes-included
-  //                       >
-  //                         Ajouter au panier
-  //                       </button>
-  //                     </div>
-  //                   </div>
-  //                 )}
-  //               </div>
-  //             </div>
-  //           </div>
-  //         )}
-  //         {children}
-  //       </components.main>
-  //       <components.footer />
-  //     </>
-  //   );
-  // },
   wrapper: ({ children, components, ...props }) => {    
+  // ---> props.title as <h1>
+    // console.log({props})
+    // console.log('wrapper children: ', children.type)
+    // console.log('wrapper comps: ', components)
+    // return <p>HOLALA</p>
     return (
-    <>
-    {/* <components.Menu {...{ components, ...props }} /> */}
-    <components.main {...{ components, ...props }}>
-    <components.header {...{ components, ...props }} >
-    {props.title && <h1>{props.title}</h1>}
-    </components.header>
-    {children}
-    </components.main>
-    <components.footer />
-    </>
+      <>
+        <components.Menu {...{ components, ...props }} />
+        <components.main {...{ components, ...props }}>
+          <components.header {...{ components, ...props }} >
+            {props.title && <h1>{props.title}</h1>}
+          </components.header>
+          {children}
+        </components.main>
+        <components.footer />
+      </>
     );
   },
   Layout: ({ children, components, ...props }) => {
@@ -404,26 +349,21 @@ const components = {
   NavPicoCss,
   Nav,
   Menu: ({ children, components, ...props }) => {
-    const topLevelPages = settings.children
-      .filter((block) => {
-        return block.role === "page" || block.role === "collection";
-      })
-      .map((block) => {
-        const page = block.children[0];
-        // if (page.data.role === "collection") {
-        //   // console.log(page.data.raw.title);
-        // }
+    const topLevelPages = props.pages
+      .filter(p => p.status === "published" && p.parents?.length === 1)
+      .map((p) => {
         return {
-          title: page?.props.title,
-          codeName: page?.codeName,
-          href: page?.props.href,
+          title: p.props.title,
+          codeName: p.codeName,
+          href: p.props.href,
         };
       });
     
-      
+    
     const index = topLevelPages?.find((p) => p.codeName === "index");
     const pages = topLevelPages?.filter((p) => p.codeName !== "index");
       
+    // return null
     return <components.nav {...{ index, pages }} />;
 
   },
@@ -437,28 +377,24 @@ const components = {
       />
     );
   },
-  Collection: ({ blockId, collectionName, components, poko, ...propsPage }) => {
-    // Need to find the page that is a child of this block
-    const collection = getCollection({
-      tree: poko.websiteTree,
-      blockId,
-      collectionName,
-    });
+  Collection: ({ components, pages, block, ...propsPage }) => {
+    // console.log({ blockId, collectionName, components, pages, ...propsPage })
+    const parentPageId = block.parent?.page_id || block.parent?.collection_id
+    const collectionName = block.child_database?.title
+    // console.dir(pages.map(p => p.parents), { depth: null })
+    const collectionItems = pages.filter(page => {
+      const parentsLength = page.parents?.length
+      return page.parents?.[parentsLength - 1]?.codeName === collectionName
+        && page.parents?.[parentsLength - 2]?.id === parentPageId
+        && page.status === "published"
+    })
 
-    return collection ? (
+    return collectionItems.length ? (
       <components.CollectionWrapper>
-        {collection?.children
-          ?.filter(
-            ({
-              data: {
-                props: { status },
-              },
-            }) => typeof status === "undefined" || status === "published"
-          )
-          .map(({ data: { id: itemId } }) => {
-            const item = poko.pages.find((p) => p.data.id === itemId);
+        {collectionItems
+          .map((item) => {
             const { components: componentsItem, ...propsItem } =
-              item.data.props;
+              item.props;
             const ld = propsItem.jsonld || {};
             const featuredImage =
               propsItem.featuredImage || ld.image?.[0] || ld.image;
@@ -473,22 +409,21 @@ const components = {
               propsItem.dateModified ||
               ld.dateModified?.start ||
               ld.dateModified;
-            const heading = propsItem.titleConcat?.string;
+            const heading = propsItem.title?.string || propsItem.title;
 
             // console.log({
             //   propsItem,
             //   author,
             //   datePublished,
             //   // components
-            //   // featuredImage,
+            //   featuredImage,
             // });
 
             return item ? (
               <components.CollectionArticle
                 {...{
-                  id: itemId,
+                  item,
                   components,
-                  poko,
                   featuredImage,
                   href: propsItem.href,
                   // heading: propsItem.title,
@@ -498,7 +433,7 @@ const components = {
                 }}
               >
                 <components.CollectionArticleFeaturedImage
-                  {...{ components, poko, featuredImage }}
+                  {...{ components, featuredImage }}
                 />
                 <components.CollectionArticleHeading
                   {...{
@@ -522,7 +457,7 @@ const components = {
   CollectionArticleFeaturedImage,
   CollectionArticleHeading,
   CollectionArticleFooter,
-  CollectionPageHeader: ({ components, poko, ...props }) => {
+  CollectionPageHeader: ({ components, pages, ...props }) => {
     const ld = props.jsonld || {};
     const featuredImage = props.featuredImage || ld.image?.[0] || ld.image;
     const author = props.author || ld.author.name;
@@ -531,7 +466,7 @@ const components = {
     return (
       <header class="stack" style="--gap: 1rem;">
         {featuredImage ? (
-          <components.ImgLazy {...{ poko, ...featuredImage }} />
+          <components.ImgLazy {...{ image: featuredImage.image }} />
         ) : null}
         {datePublished || author ? (
           <div class="cluster">
@@ -551,25 +486,24 @@ const components = {
     );
   },
   SearchBar: ({
-    collectionId: _collectionId,
+    collectionId,
     id,
     placeholder = "search",
     components,
-    poko,
-    searchbar,
-    ...props
+    searchbar, // useful if some properties are defined on the page level
+    pages,
+    ...propsRest
   }) => {
-    const collection = poko.collections.filter((page) => {
-      return (
-        page.data.id.replaceAll("-", "") === _collectionId?.replaceAll("-", "")
-      );
-    })[0];
-    const collectionId = collection.data.id;
+    const collectionIdNoHyphens = collectionId.replaceAll("-", "")
+    const items = pages.filter(p => {
+      const lastParent = p.parents?.[p.parents?.length - 1]
+      return lastParent?.id?.replaceAll("-", "") === collectionIdNoHyphens
+    })
     // const scriptId = `searchbar-script-${collectionId}${id ? `-${id}` : ""}`;
     const styleId = `searchbar-style-${collectionId}${id ? `-${id}` : ""}`;
     const inputId = `searchbar-input-${collectionId}${id ? `-${id}` : ""}`;
 
-    if (!collection) return null;
+    if (!items?.length) return null;
 
     // const [inputTerm, setInputTerm] = preactHooks.useState("");
 
@@ -589,13 +523,22 @@ const components = {
     //   return doNotMatchSelector ? `${doNotMatchSelector}{display: none;}` : "";
     // }, [inputTerm, collection.children]);
 
-    const childrenMatchingArray = collection.children?.map((child) => {
-      const str = [child.data.codeName].join(" ").toLowerCase();
+    // const childrenMatchingArray = collection.children?.map((child) => {
+    //   const str = [child.data.codeName].join(" ").toLowerCase();
+    //   return {
+    //     id: child.data.id,
+    //     str,
+    //   };
+    // });
+
+    const matchingItems = items?.map((item) => {
+      const str = [item.codeName].join(" ").toLowerCase();
       return {
-        id: child.data.id,
+        id: item.id,
         str,
       };
     });
+    
     return (
       <>
         <style
@@ -630,7 +573,7 @@ const components = {
             //   console.log(e);
             //   setInputTerm(e.target.value);
             // }}
-            data-matching-array={JSON.stringify(childrenMatchingArray)}
+            data-matching-array={JSON.stringify(matchingItems)}
             oninput={`
               const stylesEl = document.getElementById("${styleId}");
 
@@ -665,6 +608,7 @@ const components = {
       </>
     );
   },
+  HeaderBlog,
   // Columns: ({ blockId }) => {
   //   const block = getBlock(websiteTree, blockId);
   //   return block?.children?.length ? (
