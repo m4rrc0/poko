@@ -32,7 +32,7 @@
     "dev:watch": "concurrently --kill-others --names DEV,FETCH -c cyan,yellow -P npm:dev \"npm run fetch:watch -- $npm_config_delay\""
   },
   "devDependencies": {
-    "@astrojs/image": "^0.6.0",
+    "@astrojs/image": "^0.9.3",
     "@astrojs/mdx": "^0.11.2",
     "@astrojs/preact": "^1.1.0",
     "@astrojs/sitemap": "^1.0.0",
