@@ -1,6 +1,7 @@
 // Full Astro Configuration API Documentation:
 // https://astro.build/config
 import { defineConfig } from "astro/config";
+// import { loadEnv } from "vite";
 import "dotenv/config";
 import sitemap from "@astrojs/sitemap";
 import robotsTxt from "astro-robots-txt";
@@ -24,37 +25,44 @@ import image from "@astrojs/image";
 const site = process.env.SITE;
 // console.log({ site });
 
+// TODO: check this vite defineconfig way of getting env variables
+// export default defineConfig(({ command, mode }) => {
+// Load env file based on `mode` in the current working directory.
+// Set the third parameter to '' to load all env regardless of the `VITE_` prefix.
+// const env = loadEnv(mode, process.cwd(), '')
+// console.log('LOADING ENV.SITE FROM CONFIG: ', env.SITE)
+
 // @ts-check
 export default defineConfig({
-  // experimental: {
-  //   integrations: true,
-  // },
-  ...(site ? { site } : {}),
-  integrations: [
-    ...(site ? [sitemap(), robotsTxt()] : []),
-    // mdx(),
-    preact({ compat: true }),
-    // preact(),
-    // react(),
-    // image(),
-    image({
-      // logLevel: "debug",
-      serviceEntryPoint: '@astrojs/image/sharp', // useful after version 0.8.0 of @astrojs/image
-    }),
-    // fetchAhead(),
-    // astroImageTools,
-    // mdx(),
-    // image(),
-  ],
-  vite: {
-    // assetsInclude: ["**/*.png"],
-    // NOTE: necessary for astro-icon apparently (https://github.com/natemoo-re/astro-icon)
-    // ssr: {
-    //   external: ['svgo'],
-    // },
-    plugins: [
-      // viteCommonjs(),
-      // mdx(/* jsxImportSource: …, otherOptions… */)
-  ],
-  },
+	// experimental: {
+	//   integrations: true,
+	// },
+	...(site ? { site } : {}),
+	integrations: [
+		...(site ? [sitemap(), robotsTxt()] : []),
+		// mdx(),
+		preact({ compat: true }),
+		// preact(),
+		// react(),
+		// image(),
+		image({
+			// logLevel: "debug",
+			serviceEntryPoint: "@astrojs/image/sharp", // useful after version 0.8.0 of @astrojs/image
+		}),
+		// fetchAhead(),
+		// astroImageTools,
+		// mdx(),
+		// image(),
+	],
+	vite: {
+		// assetsInclude: ["**/*.png"],
+		// NOTE: necessary for astro-icon apparently (https://github.com/natemoo-re/astro-icon)
+		// ssr: {
+		//   external: ['svgo'],
+		// },
+		plugins: [
+			// viteCommonjs(),
+			// mdx(/* jsxImportSource: …, otherOptions… */)
+		],
+	},
 });

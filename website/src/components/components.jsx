@@ -300,37 +300,37 @@ const components = {
   // nav: Nav,
 
   // --- SPECIAL COMPONENTS --- //
-  // wrapper: ({ children, components, ...props }) => {
-  //   return (
-  //     <>
-  //       <components.Menu {...{ components, ...props }} />
-  //       <components.main {...{ components, ...props }}>
-  //         <components.header {...{ components, ...props }} />
-  //         {children}
-  //       </components.main>
-  //       <components.footer />
-  //     </>
-  //   );
-  // },
-  wrapper: ({ children, components, ...props }) => {    
-  // ---> props.title as <h1>
-    // console.log({props})
-    // console.log('wrapper children: ', children.type)
-    // console.log('wrapper comps: ', components)
-    // return <p>HOLALA</p>
+  wrapper: ({ children, components, ...props }) => {
     return (
       <>
         <components.Menu {...{ components, ...props }} />
         <components.main {...{ components, ...props }}>
-          <components.header {...{ components, ...props }} >
-            {props.title && <h1>{props.title}</h1>}
-          </components.header>
+          <components.header {...{ components, ...props }} />
           {children}
         </components.main>
         <components.footer />
       </>
     );
   },
+  // wrapper: ({ children, components, ...props }) => {    
+  // // ---> props.title as <h1>
+  //   // console.log({props})
+  //   // console.log('wrapper children: ', children.type)
+  //   // console.log('wrapper comps: ', components)
+  //   // return <p>HOLALA</p>
+  //   return (
+  //     <>
+  //       <components.Menu {...{ components, ...props }} />
+  //       <components.main {...{ components, ...props }}>
+  //         <components.header {...{ components, ...props }} >
+  //           {props.title && <h1>{props.title}</h1>}
+  //         </components.header>
+  //         {children}
+  //       </components.main>
+  //       <components.footer />
+  //     </>
+  //   );
+  // },
   Layout: ({ children, components, ...props }) => {
     return (
       <>
@@ -607,6 +607,9 @@ const components = {
         </div>
       </>
     );
+  },
+  HeaderTitle: ({ components, pages, ...props }) => {
+    return props.title && <h1>{props.title}</h1>
   },
   HeaderBlog,
   // Columns: ({ blockId }) => {
