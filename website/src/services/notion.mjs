@@ -346,6 +346,7 @@ export function treeToMd(blocks) {
   const mdString = n2m
     .toMarkdownString(blocks)
     .trim() // trim() to remove leading (and trailing) "\n" to allow top level frontmatter
+    // .replace(/(\r\n|\r|\n)/, `\s\s\n`) // TODO: find a way to keep simple line breaks
     .replace(/‘/g, "'")
     .replace(/’/g, "'")
     .replace(/“/g, '"')

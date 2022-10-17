@@ -10,7 +10,7 @@ import mdx from "@astrojs/mdx";
 import preact from "@astrojs/preact";
 import image from "@astrojs/image";
 
-// import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
+import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
 // import mdx from "@mdx-js/rollup";
 // import { astroImageTools } from "astro-imagetools";
 // import mdx from "@astrojs/mdx";
@@ -61,7 +61,7 @@ export default defineConfig({
 		//   external: ['svgo'],
 		// },
 		plugins: [
-			// viteCommonjs(),
+			viteCommonjs(),
 			// mdx(/* jsxImportSource: …, otherOptions… */)
 		],
 	},

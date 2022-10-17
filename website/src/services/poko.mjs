@@ -1,3 +1,80 @@
+import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
+import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+// import remarkUnwrapImages from "remark-unwrap-images";
+import remarkGfm from "remark-gfm";
+// import rehypeSlug from "rehype-slug";
+import remarkBreaks from 'remark-breaks'
+
+export const mdxConfigForExports = {
+    mdxOptions(options, frontmatter) {
+      options.jsxImportSource = 'preact'
+      options.remarkPlugins = [
+        ...(options.remarkPlugins ?? []),
+        // [
+        //   remarkFrontmatter,
+        //   {
+        //     type: "yaml",
+        //     fence: { open: "```yaml", close: "```" },
+        //     // anywhere: true,
+        //   },
+        // ],
+        // remarkMdxFrontmatter,
+        // remarkUnwrapImages,
+        remarkBreaks,
+        remarkGfm,
+      ];
+      options.rehypePlugins = [
+        ...(options.rehypePlugins ?? []),
+        // rehypeSlug
+      ];
+      return options;
+    },
+    // esbuildOptions(options, frontmatter) {
+    //   // options.minify = false;
+    //   // options.target = ['es2020','chrome58','firefox57','safari11','edge16','node12']
+    //   return options;
+    // },
+    //   files: {"./demo.tsx": `
+    // import * as React from 'react'
+    // function Demo() {return <div>Neat demo!</div>}
+    // export default Demo`},
+}
+
+export const mdxConfigForPages = {
+  mdxOptions(options, frontmatter) {
+    options.jsxImportSource = 'preact'
+    options.remarkPlugins = [
+      ...(options.remarkPlugins ?? []),
+      // [
+      //   remarkFrontmatter,
+      //   {
+      //     type: "yaml",
+      //     fence: { open: "```yaml", close: "```" },
+      //     // anywhere: true,
+      //   },
+      // ],
+      // remarkMdxFrontmatter,
+      // remarkUnwrapImages,
+      remarkBreaks,
+      remarkGfm,
+    ];
+    options.rehypePlugins = [
+      ...(options.rehypePlugins ?? []),
+      // rehypeSlug
+    ];
+    return options;
+  },
+  // esbuildOptions(options, frontmatter) {
+  //   // options.minify = false;
+  //   // options.target = ['es2020','chrome58','firefox57','safari11','edge16','node12']
+  //   return options;
+  // },
+  //   files: {"./demo.tsx": `
+  // import * as React from 'react'
+  // function Demo() {return <div>Neat demo!</div>}
+  // export default Demo`},
+}
+
 export const presetsDico = {
     HeaderTitle: {
         components: {
@@ -37,3 +114,4 @@ export const getPresets = props => {
     
     return presets
 }
+

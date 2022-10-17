@@ -14,11 +14,6 @@ import hash from "object-hash";
 import { bundleMDX } from "mdx-bundler";
 import { getMDXExport } from "mdx-bundler/client/index.js";
 // import { MDXRemote } from "next-mdx-remote";
-import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
-import remarkMdxFrontmatter from "remark-mdx-frontmatter";
-// import remarkUnwrapImages from "remark-unwrap-images";
-import remarkGfm from "remark-gfm";
-// import rehypeSlug from "rehype-slug";
 import nanomemoize from 'nano-memoize'
 import { getImage, getPicture } from "@astrojs/image";
 import probeImageSize from "probe-image-size";
@@ -48,7 +43,7 @@ import {
   rootId,
   dicoNotionBlockTypes,
 } from "@services/notion.mjs";
-import { getPresets } from "@services/poko.mjs"
+import { mdxConfigForExports, mdxConfigForPages, getPresets } from "@services/poko.mjs"
 import { MDXPage, HandlebarsPage } from "@layouts";
 
 
@@ -79,39 +74,6 @@ export async function getStaticPaths() {
 
   const DEBUG = process.argv.find((str) => str.match("DEBUG"));
 
-  const mdxConfig = {
-      mdxOptions(options, frontmatter) {
-        options.jsxImportSource = 'preact'
-        options.remarkPlugins = [
-          ...(options.remarkPlugins ?? []),
-          // [
-          //   remarkFrontmatter,
-          //   {
-          //     type: "yaml",
-          //     fence: { open: "```yaml", close: "```" },
-          //     // anywhere: true,
-          //   },
-          // ],
-          // remarkMdxFrontmatter,
-          // remarkUnwrapImages,
-          remarkGfm,
-        ];
-        options.rehypePlugins = [
-          ...(options.rehypePlugins ?? []),
-          // rehypeSlug
-        ];
-        return options;
-      },
-      // esbuildOptions(options, frontmatter) {
-      //   // options.minify = false;
-      //   // options.target = ['es2020','chrome58','firefox57','safari11','edge16','node12']
-      //   return options;
-      // },
-      //   files: {"./demo.tsx": `
-      // import * as React from 'react'
-      // function Demo() {return <div>Neat demo!</div>}
-      // export default Demo`},
-  }
 
   let pokoPrev = {};
   if (existsSync(systemFileData)) {
@@ -150,9 +112,12 @@ export async function getStaticPaths() {
 
   let rootID = rootId();
   let root;
+  let pageForComponentsId;
   let pages = [];
+  // let pagesLight = []
   let blocks = [];
   let collections = [];
+  let components = [];
   let settings;
   let globalStylesString = "";
   let headString = "";
@@ -169,7 +134,7 @@ export async function getStaticPaths() {
       // const md = treeToMd(children);
       // const m_bundleMDX = nanomemoize(bundleMDX)
       // const mdx = md
-      //   ? await bundleMDX({source: md, ...mdxConfig})
+      //   ? await bundleMDX({source: md, ...mdxConfigForExports})
       //   : { code: undefined };
       let mdxBlocksIndexes = []
       const mdxBlocks = children
@@ -185,7 +150,7 @@ export async function getStaticPaths() {
         .map(c => c?.code?.rich_text?.[0]?.plain_text)
         .join('\n')
       const mdxForExports = mdxBlocksString
-        ? await bundleMDX({source: mdxBlocksString, ...mdxConfig})
+        ? await bundleMDX({source: mdxBlocksString, ...mdxConfigForExports})
         : { code: undefined };
       const {
         default: _defaultExport,
@@ -367,7 +332,7 @@ export async function getStaticPaths() {
     // node._titlePropName = raw._titlePropName; // the name of the property holding the 'title' of the page
     // node._title = raw._title; // the title object
     node.codeName = raw.codeName; // the plain text version of the title
-    // node.inlineMd = raw.inlineMd;
+    node.inlineMd = "";
     // node.md = raw.md;
     // node.mdx = raw.mdx;
 
@@ -389,22 +354,73 @@ export async function getStaticPaths() {
       node.type = "page";
       node.role = "page";
     } else if (raw.object === "database") {
-      node.type = "page";
-      node.role = "collection";
+      node.type = "collection";
+      node.role = "page";
     } else if (raw.object === "block") {
       node.type = "block";
       node.role = dicoNotionBlockTypes[raw.type];
+      // TODO: I could / should track from here specific blocks like global styles, MDX components, ...
+      // and assign a role
     } else {
       console.warn(
         `WARNING: the following node does not have a recognizable type`
       );
       console.warn(JSON.stringify(raw));
     }
+    // Change defaults type or role for exceptions
+    if (node.type === "page") {
+      // Can be a page or a database
+      if (raw.codeName.startsWith('_')) {
+        node.role = "container";
+      }
+      if (raw.codeName === "_components" && (raw.parentId === rootID || raw.parentId === pageForComponentsId)) {
+        pageForComponentsId = raw.id
+      } else if (raw.parentId === pageForComponentsId) {
+        node.role = "component";
+      }
+    }
 
-    if (node.type === "root" || node.type === "page") {
+    // Initial setup of the props object
+    node.props = {
+        poko: {
+          // pages: pagesLight,
+          // settings, // ???
+          // components, // ??? would correspond to user defined components here
+          page: {
+            // id: node.id,
+            // codeName: node.codeName,
+            // emoji: node.emoji,
+            // type: node.type,
+            // role: node.role,
+            // parents: node.parents,
+            // status: node.status,
+            // path,
+            // slug,
+            // href,
+          },
+          block: {
+            //   id: node.id,
+            //   emoji: node.emoji,
+            //   type: node.type,
+            //   role: node.role,
+            //   parents: node.parents
+          },
+        },
+        page: {
+          // self: propsSelf,
+          // rawProperties: raw.properties,
+          // ...props,
+        },
+        block: {
+          // self: propsSelf,
+        }
+      };
+
+    // Setup parents, props and status on those types
+    if (/root|page|collection/.test(node.type)) {
       // Setup parents on every page (even hidden pages)
       const parents = ancestors
-        ?.filter((a) => a.type === "page" || a.type === "root")
+        ?.filter((a) => /root|page|collection/.test(a.type))
         // Remove keys we don't need from parents
         .map(({ children, parents, richText, blockProps, inlinePlainText, ...parent }) => parent);
       node.parents = parents.map(({ props, propsSelf, raw, ...parent }) => parent);
@@ -477,23 +493,30 @@ export async function getStaticPaths() {
       }
       node.propsSelf = propsSelf
 
+      node.props.poko.page = {
+        id: node.id,
+        timeEdited: raw.last_edited_time,
+        codeName: node.codeName,
+        title: propsSelf.title,
+        emoji: node.emoji,
+        type: node.type,
+        role: node.role,
+        parents: node.parents,
+        // The following are coming later
+        // status,
+        // path,
+        // slug,
+        // href,
+      }
+      node.props.page.self = propsSelf
+
       // merge props from parents to current page
-      const parentsProps = parents?.map((p) => p?.propsSelf).filter((z) => z) || [];
-      const props = deepMergePropsAllPages([...parentsProps, propsSelf]);
+      const parentsProps = parents?.map((p) => p?.props).filter((z) => z) || [];
+      const props = deepMergePropsAllPages([...parentsProps, node.props]);
+
+      node.props = props;
   
-      node.props = {
-        self: propsSelf,
-        // rawProperties: raw.properties,
-        _page: {
-          id: node.id,
-          codeName: node.codeName,
-          emoji: node.emoji,
-          type: node.type,
-          role: node.role,
-          parents: node.parents
-        },
-        ...props,
-      };
+      // console.log(props)
 
       node.status =
         (raw.archived && "archived")
@@ -501,24 +524,28 @@ export async function getStaticPaths() {
         || (node.codeName.startsWith("_") && "hidden")
         || (typeof props?.status === 'string' && props?.status)
         || ("published");
+
+      node.props.page.status = node.status;
+      node.props.poko.page.status = node.status;
       
-      node.props.status = node.status
+      // node.props.status = node.status
     }
 
-    if (node.type === "page") {
-      if (node.codeName.startsWith("_")) {
-        node.status = typeof node.propsSelf?.status === 'string'
-          ? node.propsSelf.status
-          : "hidden";
+    if (node.type !== "block" && /page|container/.test(node.role)) {
+      if (node.role === "container") {
+        // TODO: check if this is not necessary anymore. Should be handled above
+        // node.status = typeof node.propsSelf?.status === 'string'
+        //   ? node.propsSelf.status
+        //   : "hidden";
       } else {
         // Slug and Path ONLY on non-hidden pages
         // Slug and Path
         // NOTE: this path is only the last section, corresponding to the codeName of the page
-        const { slug, path } = typeof node.propsSelf?.path === 'string'
-          ? slugifyPath(node.propsSelf?.path)
+        const { slug, path } = typeof node.props?.page?.self?.path === 'string'
+          ? slugifyPath(node.props?.page?.self?.path)
           : slugifyPath(node.codeName);
-        node.slug = typeof node.propsSelf?.slug === 'string'
-          ? slugify(node.propsSelf?.slug)
+        node.slug = typeof node.props?.page?.self?.slug === 'string'
+          ? slugify(node.props?.page?.self?.slug)
           : slug;
 
         // REMARK: need to account for hidden pages
@@ -530,8 +557,11 @@ export async function getStaticPaths() {
             .filter((z) => z) // remove empty paths e.g. the 'index' page to avoid leading or double  '/'
             .join("/") || undefined;
 
+        node.props.poko.page.path = node.path
+        node.props.poko.page.slug = node.slug
+
         // Just to avoid confusion with path that has no leading '/'
-        node.props.href = "/" + (node.path ? node.path + '/' : '');
+        node.props.poko.page.href = "/" + (node.path ? node.path + '/' : '');
 
         //
         // Save a MAP of all the pages with the Notion ID, Notion URLs and our local path
@@ -544,21 +574,28 @@ export async function getStaticPaths() {
           // notionHyphenPath: `/${node.id}`,
           // notionFullPath: `https://www.notion.so/${pageId}`,
           path: node.path,
-          href: node.props.href,
+          href: node.props.poko.page.href,
         };
         allPaths.push(pathMap);
       }
 
       // Push page to flat list (even hidden pages)
+      // const nodeLight = { ...node }
+      // for (let key of ['md', 'children', 'propsSelf', 'raw', 'richText', 'blockProps', 'inlinePlainText']) {
+      //   delete nodeLight[key];
+      // }
       pages.push(node);
+      // pagesLight.push(nodeLight);
 
-      if (node.role === "collection") {
+      if (node.type === "collection") {
         collections.push(node);
       }
-    } else if (node.type === "root") {
+    } else if (node.role === "settings") {
       settings = node;
-      // Everything else are blocks
+    } else if (node.role === "component") {
+      components.push(node)
     } else {
+      // Everything else are blocks
       if (node.role === "file") {
         // const remoteUrl = node?.blockProps?.file?.url
         const commons = {
@@ -602,6 +639,27 @@ export async function getStaticPaths() {
         // Do thins on blocks inside pages (or )
       }
 
+      // Assign props of blocks
+      node.props.poko.block = {
+        id: node.id,
+        timeEdited: raw.last_edited_time,
+        emoji: node.emoji,
+        type: node.type,
+        role: node.role,
+        parents: node.parents,
+        // status: node.status,
+        richText: node.richText,
+        plainText: node.inlinePlainText,
+        inlineMd: node.inlineMd,
+        blockProps: node.blockProps,
+        ...node.blockProps // TODO: see if it works even if blockProps are modified lower
+      };
+      node.props.block = {
+        // self: propsSelf, // TODO: currently no way to set props on a block itself
+        // ...props,
+        // TODO: props from the subBlocks prop on parents
+      }
+
       blocks.push(node);
 
     }
@@ -642,9 +700,21 @@ export async function getStaticPaths() {
       const md = treeToMd(page.children?.map(c => ({ ...c, parent: c.inlineMd })));
       page.md = md
 
+      // const mdx = md
+      //   ? await bundleMDX({source: md, ...mdxConfigForPages})
+      //   : { code: undefined };
+    })
+  );
+
+  await Promise.all(
+    components.map(async (component) => {
+      const md = treeToMd(component.children?.map(c => ({ ...c, parent: c.inlineMd })));
       const mdx = md
-        ? await bundleMDX({source: md, ...mdxConfig})
+        ? await bundleMDX({source: md, ...mdxConfigForPages})
         : { code: undefined };
+        
+      component.md = md
+      component.mdx = mdx
     })
   );
 
@@ -804,6 +874,7 @@ export async function getStaticPaths() {
     cache: { hash: contentHash },
     settings,
     pages,
+    components,
     collections,
     files: allFiles,
     paths: allPaths,
@@ -820,22 +891,32 @@ export async function getStaticPaths() {
   } else if (existsSync(systemPathData)) {
     await fs.rm(systemPathData);
   }
-  await fs.writeFile(systemPathData, JSON.stringify(poko));
+  // await fs.writeFile(systemPathData, JSON.stringify(poko));
 
-  const pagesLight = pages.map(({ md, children, propsSelf, raw, richText, blockProps, inlinePlainText, ...p }) => p)
+  // pages.forEach(p => {
+  //   if (p.codeName === '_footer') {
+  //     console.log(p)
+  //   }
+  // })
+
+  // const _pages = pages.map(({ md, children, propsSelf, raw, richText, blockProps, inlinePlainText, ...p }) => p)
+  const _pages = pages.map(({ props }) => props)
+  // console.dir(_pages, { depth: 5 })
   const staticPaths = pages
     .filter(p => p.status === 'published')
     .map((p) => {
-      // console.log(p.path, "\n");
-      // if (p.path === "boutique/twin-it") {
-      //   console.log({ info: p })
-      // }
+      const selfProps = p.props
+      // console.dir(selfProps, { depth: 3 });
+      selfProps.poko.pages = _pages
       return [
         {
           params: { path: p.path },
           props: {
-            page: p,
-            pages: pagesLight,
+            selfProps,
+            md: p.md,
+            // _page: p,
+            // _pages,
+            componentsFromPages: components,
             // collections,
             // settings,
             globalStylesString,

@@ -1,13 +1,16 @@
+import postcss from 'postcss';
 import {
   getNotionPage,
   getAllNotionPages,
   getBlockChildren,
   rootId,
 } from "@services/notion.mjs";
+import postCssConfig from '@root/postcss.config.cjs'
 
 export async function get() {
   let rootID = rootId();
   let root;
+  const from = "dist/user-styles.css"
 
   if (rootID) {
     // root = await getNotionPage(rootID);
@@ -25,11 +28,18 @@ export async function get() {
   const blocks = await getBlockChildren(rootID)
   const globalStylesBlock = blocks.find(b => b?.code?.language === 'css')
   
-  const globalStylesString = globalStylesBlock?.code?.rich_text?.[0]?.plain_text || ''
+  let globalStylesString = globalStylesBlock?.code?.rich_text?.[0]?.plain_text || ''
 
   if (!globalStylesString) {
     console.warn("No global Styles found")
   }
+
+
+  await postcss(postCssConfig.plugins).process(globalStylesString, { from, to: from }).then(result => {
+    // console.log(result.css)
+    globalStylesString = result.css
+  })
+
 
   return {
     body: globalStylesString,

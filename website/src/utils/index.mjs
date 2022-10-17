@@ -1,6 +1,7 @@
 import deepmerge from "deepmerge";
 import Downloader from "nodejs-file-downloader";
 import StreamZip from "node-stream-zip";
+import _set from "lodash.set";
 
 export { notionHelpers } from "./notionHelpers.mjs";
 
@@ -39,6 +40,51 @@ export const slugifyPath = (codeName) => {
   return { slug, path };
 };
 
+function isObject(obj) {
+  return !!obj && obj.constructor === Object;
+}
+
+// Michmach from https://gist.github.com/ahtcx/0cd94e62691f539160b32ecda18af3d6
+function deepMergeInner(target, source){
+  const result = {...target,...source};
+  const keys = Object.keys(result);
+  
+  for(const key of keys){
+    const targetValue = target[key];
+    const sourceValue = source[key];
+    
+    if (Array.isArray(targetValue) && Array.isArray(sourceValue)) {
+        result[key] = targetValue.concat(sourceValue);
+    } else if (isObject(targetValue) && isObject(sourceValue)) {
+        result[key] = deepMergeInner(targetValue, sourceValue);
+    }
+  }
+ 
+  return result;
+}
+export function simpleDeepMerge(..._objects) {
+  let objects = [..._objects]
+
+  if (objects.length < 2) {
+    // Maybe we passed an array instead of a list of objects
+    if (Array.isArray(objects[0])) simpleDeepMerge(...objects[0])
+    else return objects[0]
+  }
+
+  if (objects.some(object => !isObject(object))) {
+      throw new Error('deepMerge: all values should be of type "object"');
+  }
+
+  const target = objects.shift();
+  let source;
+
+  while (source = objects.shift()) {
+    deepMergeInner(target, source);
+  }
+
+  return target;
+}
+
 export const parseFileUrl = (url) => {
   if (typeof url !== "string") return { filename: null, extension: null };
 
@@ -55,7 +101,19 @@ export function escapeRegExp(string) {
   return string.replace(/[.*+?^${}()|[\]\\]/g, "\\$&"); // $& means the whole matched string
 }
 
-export const deepMergePropsSelf = (arrOfPropsObj) => {
+export const deepMergePropsSelf = (_arrOfPropsObj) => {
+  // Expand dot notation keys (only first level) before merging
+  const arrOfPropsObj = _arrOfPropsObj.map(propsObj => {
+    for (const key in propsObj) {
+      if (key.match(/\./)) {
+        const val = propsObj[key]
+        delete propsObj[key]
+        _set(propsObj, key, val);
+      }
+    }
+    return propsObj
+  })
+
   return deepmerge.all(arrOfPropsObj);
   // const { self, ...props } = deepmerge.all(arrOfPropsObj);
   // return {
@@ -74,34 +132,46 @@ export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
   }
   if (_arrOfAncestorsProps.length === 1) {
     // These are only the settings
-    return deepmerge.all(_arrOfAncestorsProps);
+    return {
+      ..._arrOfAncestorsProps[0],
+      // page: deepMergePropsSelf([_arrOfAncestorsProps[0].page])
+    }
   }
 
-  let prev_children = undefined;
+  let prev_children = {};
   // TODO: merge _self into props BUT remove what were passed from parents' _self ??
   // let prev_self = undefined;
-  const arrOfPropsObj = _arrOfAncestorsProps
+  const arrOfProps = _arrOfAncestorsProps
     // .filter((p) => p.title) // remove non-pages from the list
     .map((propsObj, i, arr) => {
+      const { role } = propsObj.poko.page // To match subPages targets
+      const self = propsObj.page.self
+
       const isSettings = i === 0;
       const isSelf = i === arr.length - 1;
 
       const {
         raw,
-        self,
+        // self,
         _self,
         _page,
         _children,
+        subPages,
         title,
         // href,
         metadata,
         jsonld,
         components,
         ...restProps
-      } = propsObj;
+      } = self;
 
-      const currentProps = deepmerge.all([
-        { ...prev_children }, // merge the _children prop from a parent
+      const fromPrevChildren = {
+        ...prev_children?.all,
+        ...prev_children?.[role],
+      }
+
+      const propsPageMerged = deepmerge.all([
+        { ...fromPrevChildren }, // merge the _children prop from a parent
         (isSettings || isSelf) && metadata ? { metadata } : {}, // only merge current metadata with the global ones from settings
         (isSettings || isSelf) && jsonld ? { jsonld } : {}, // only merge current jsonld with the global ones from settings
         // these next props are not merged. Only keep the value of the current page.
@@ -110,6 +180,7 @@ export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
         isSelf && _self ? { _self } : {},
         isSelf && _page ? { _page } : {},
         isSelf && _children ? { _children } : {},
+        isSelf && subPages ? { subPages } : {},
         // isSelf && href ? { href } : {},
         // isSelf && title ? { title } : {},
         // Everything else is merged
@@ -117,7 +188,7 @@ export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
         restProps,
       ]);
 
-      const possibleComponentsAdded = Object.entries(currentProps).reduce(
+      const possibleComponentsAdded = Object.entries(propsPageMerged).reduce(
         (prev, [key, val]) => {
           const isFunction = typeof val === "function";
           const hasCompName =
@@ -128,17 +199,24 @@ export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
           return { ...prev, ...next };
         },
         {
-          ...(currentProps?.components || {}),
+          ...(propsPageMerged?.components || {}),
           ...components
         }
       );
 
-      prev_children = _children;
+      prev_children = deepmerge(prev_children, subPages || _children || {});
 
-      return { ...currentProps, components: possibleComponentsAdded };
+      return {
+        ...propsObj,
+        page: {
+          ...propsPageMerged,
+          components: possibleComponentsAdded,
+        }
+      }
+      // return { ...propsPageMerged, components: possibleComponentsAdded };
     });
 
-  return deepmerge.all(arrOfPropsObj);
+  return deepmerge.all(arrOfProps);
 };
 
 

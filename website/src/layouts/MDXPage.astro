@@ -8,67 +8,37 @@ import MDXBundler from "../components/MDXBundler.jsx";
 import { bundleMDX } from "mdx-bundler";
 // import { getMDXExport } from "mdx-bundler/client/index.js";
 // import { MDXRemote } from "next-mdx-remote";
-import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
-import remarkMdxFrontmatter from "remark-mdx-frontmatter";
-// import remarkUnwrapImages from "remark-unwrap-images";
-import remarkGfm from "remark-gfm";
-// import rehypeSlug from "rehype-slug";
+import { mdxConfigForPages } from '@services/poko.mjs'
 
-const mdxConfig = {
-  mdxOptions(options, frontmatter) {
-    options.jsxImportSource = 'preact'
-    options.remarkPlugins = [
-      ...(options.remarkPlugins ?? []),
-      // [
-      //   remarkFrontmatter,
-      //   {
-      //     type: "yaml",
-      //     fence: { open: "```yaml", close: "```" },
-      //     // anywhere: true,
-      //   },
-      // ],
-      // remarkMdxFrontmatter,
-      // remarkUnwrapImages,
-      remarkGfm,
-    ];
-    options.rehypePlugins = [
-      ...(options.rehypePlugins ?? []),
-      // rehypeSlug
-    ];
-    return options;
-  },
-  // esbuildOptions(options, frontmatter) {
-  //   // options.minify = false;
-  //   // options.target = ['es2020','chrome58','firefox57','safari11','edge16','node12']
-  //   return options;
-  // },
-  //   files: {"./demo.tsx": `
-  // import * as React from 'react'
-  // function Demo() {return <div>Neat demo!</div>}
-  // export default Demo`},
-}
 const { href: canonicalUrl, pathname } = new URL(Astro.url.pathname, Astro.site);
-const { page, pages, tree, globalStylesString, headString } =
-  Astro.props;
+const {
+  // _page, _pages,
+  md,
+  selfProps,
+  componentsFromPages, tree, globalStylesString, headString
+} = Astro.props;
 
-    const { md, props } = page;
+selfProps.poko.page.pathname = pathname
+selfProps.poko.page.canonicalUrl = canonicalUrl
+
+    // const { md, props } = _page;
 
 // const mdx = md
-//   ? await bundleMDX({source: md, ...mdxConfig})
+//   ? await bundleMDX({source: md, ...mdxConfigForPages})
 //   : { code: undefined };
-const mdx = await bundleMDX({source: md, ...mdxConfig})
-
+const mdx = await bundleMDX({source: md, ...mdxConfigForPages})
 const { code } = mdx
 
-const dataForComponents = { pages, pathname, canonicalUrl }
+// const dataForComponents = { _pages, _self: { pathname, canonicalUrl } }
+
 
 // console.log(props.components)
 
 ---
 
-<SkeletonPage {...{ path: pathname, ...props}}>
+<SkeletonPage {...{ path: pathname, ...selfProps.poko.page, ...selfProps.page }}>
   <Fragment slot="head" set:html={headString} />
 
   <!-- {code ? <MDXBundler {...{ code, frontmatter: undefined, props, dataForComponents }} /> : null} -->
-  <MDXBundler {...{ code, frontmatter: undefined, props, dataForComponents }} />
+  <MDXBundler {...{ code, frontmatter: undefined, selfProps, componentsFromPages }} />
 </SkeletonPage>

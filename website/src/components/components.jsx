@@ -3,6 +3,9 @@ import { h } from 'preact'
 // import * as preactHooks from "preact/hooks";
 import { visitParents } from "unist-util-visit-parents";
 // import { store } from "@services/notion.js";
+import _get from "lodash.get";
+import _merge from "lodash.merge";
+import deepmerge from "deepmerge";
 import { notionHelpers } from "@utils";
 // import poko from "@poko";
 import Anon from "@components/Anon.jsx";
@@ -44,17 +47,34 @@ const getCollection = ({ tree, blockId, collectionName }) => {
 };
 
 export const addProps = (components, defaultProps) => {
+  // console.dir(defaultProps, { depth: 1 })
   const withProps = {};
 
   for (const [key, Component] of Object.entries(components)) {
-    if (typeof Component === "function") {
-      withProps[key] = (props) => <Component {...defaultProps} {...props} />;
-    } else if (typeof Component === 'string' && /^[A-Z]/.test(Component) && !!components[Component]) {
-      const Comp = components[Component]
-      withProps[key] = (props) => <Comp {...defaultProps} {...props} />;
-    } else {
-      withProps[key] = Component;
+    withProps[key] = (props) => {
+      // const propsMerged = deepmerge(defaultProps, props)
+      const propsMerged = {...defaultProps, ...props}
+
+      if (typeof Component === "function") {
+        return <Component {...propsMerged} />;
+      } else if (typeof Component === 'string' && /^[A-Z]/.test(Component) && !!components[Component]) {
+        const Comp = components[Component]
+        return <Comp {...propsMerged} />;
+      } else {
+        // withProps[key] = Component;
+        return null;
+      }
     }
+
+    // if (typeof Component === "function") {
+    //   withProps[key] = (props) => <Component {...defaultProps} {...props} />;
+    // } else if (typeof Component === 'string' && /^[A-Z]/.test(Component) && !!components[Component]) {
+    //   const Comp = components[Component]
+    //   withProps[key] = (props) => <Comp {...defaultProps} {...props} />;
+    // } else {
+    //   // withProps[key] = Component;
+    //   withProps[key] = () => null;
+    // }
   }
 
   return withProps;
@@ -241,25 +261,37 @@ const HeaderBlog = ({ components, poko, ...props }) => {
   );
 }
 
-const components = {
-  // --- EXAMPLES FROM DOCS --- //
-  // // Map `h1` (`# heading`) to use `h2`s.
-  // h1: 'h2',
-  // // Rewrite `em`s (`*like so*`) to `i` with a goldenrod foreground color.
-  // em: (props) => <i style={{color: 'goldenrod'}} {...props} />,
-  // // Pass a layout (using the special `'wrapper'` key).
-  // wrapper: ({components, ...rest}) => <main {...rest} />,
-  // // Pass a component.
-  // Planet: () => 'Neptune',
-  // // This nested component can be used as `<theme.text>hi</theme.text>`
-  // theme: {text: (props) => <span style={{color: 'grey'}} {...props} />},
+// NOTE: For classes, use "blockName-elemName_modName_modVal" ??
 
+const Component = ({ tag, children, components, subSelectors, poko, page, block, ...rest }) => {
+  // const { _self, _page, _pages, metadata, subPages, title, presets, status, ...rest } = restRaw
+  const Comp = components[tag]
+  if (!Comp) return null
+  
+  let as = ['all', tag]
+  if (typeof subSelectors === 'string') as.push(subSelectors)
+  else if (Array.isArray(subSelectors)) as.push(...subSelectors)
+
+  const blockPropsFromPageArr = as.map(subPropsPath => page.subBlocks?.[subPropsPath]).filter(z => z)
+  const blockPropsFromPage = blockPropsFromPageArr[blockPropsFromPageArr.length - 1] || {}
+  // const props = _merge(blockPropsFromPage, rest)
+  // const props = {...rest, ...blockPropsFromPage}
+  const props = {}
+
+  return <Comp {...{ ...props, components, children, poko, page, block }} />
+}
+
+const components = {
+  Component,
+  C: Component,
   // --- ALL HTML ELEMENTS IN MD --- //
   // a: ({ href: _href, ...props }) => {
   //   const href = notionHelpers.convertHref(_href, poko);
   //   return <a {...{ ...props, href }} />;
   // },
-  a: ({ children, components, href, ...props }) => <Anon {...{ tag: 'a', href, ...props?.a }}>{children}</Anon>, // prettier-ignore
+  div: ({ children, components, ...props }) => <Anon {...{ tag: 'div', ...props?.div }}>{children}</Anon>, // prettier-ignore
+  // a: ({ children, components, href, ...props }) => <Anon {...{ tag: 'a', href, ...props?.a }}>{children}</Anon>, // prettier-ignore
+  a: (props) => <Component {...{ tag: 'a', ...props }} />, // prettier-ignore
   blockquote: ({ children, components, ...props }) => <Anon {...{ tag: 'blockquote', ...props?.blockquote }}>{children}</Anon>, // prettier-ignore
   br: ({ children, components, ...props }) => <Anon {...{ tag: 'br', ...props?.br }}>{children}</Anon>, // prettier-ignore
   code: ({ children, components, ...props }) => <Anon {...{ tag: 'code', ...props?.code }}>{children}</Anon>, // prettier-ignore
@@ -275,7 +307,8 @@ const components = {
   // img: 'ImgLazy', // prettier-ignore
   li: ({ children, components, ...props }) => <Anon {...{ tag: 'li', ...props?.li }}>{children}</Anon>, // prettier-ignore
   ol: ({ children, components, ...props }) => <Anon {...{ tag: 'ol', ...props?.ol }}>{children}</Anon>, // prettier-ignore
-  p: ({ children, components, ...props }) => <Anon {...{ tag: 'p', ...props?.p }}>{children}</Anon>, // prettier-ignore
+  // p: ({ children, components, ...props }) => <Anon {...{ tag: 'p', ...props?.p }}>{children}</Anon>, // prettier-ignore
+  p: (props) => <Component {...{ tag: 'p', ...props }} />, // prettier-ignore
   pre: ({ children, components, ...props }) => <Anon {...{ tag: 'pre', ...props?.pre }}>{children}</Anon>, // prettier-ignore
   strong: ({ children, components, ...props }) => <Anon {...{ tag: 'strong', ...props?.strong }}>{children}</Anon>, // prettier-ignore
   ul: ({ children, components, ...props }) => <Anon {...{ tag: 'ul', ...props?.ul }}>{children}</Anon>, // prettier-ignore
@@ -296,7 +329,8 @@ const components = {
   header: ({ children, components, ...props }) => <Anon {...{ tag: 'header', ...props?.header }}>{children}</Anon>, // prettier-ignore
   aside: ({ children, components, ...props }) => <Anon {...{ tag: 'aside', ...props?.aside }}>{children}</Anon>, // prettier-ignore
   article: ({ children, components, ...props }) => <Anon {...{ tag: 'article', ...props?.article }}>{children}</Anon>, // prettier-ignore
-  nav: ({ children, components, ...props }) => <Anon {...{ tag: 'nav', ...props?.nav }}>{children}</Anon>, // prettier-ignore
+  // nav: ({ children, components, ...props }) => <Anon {...{ tag: 'nav', ...props?.nav }}>{children}</Anon>, // prettier-ignore
+  nav: (props) => <Component {...{ tag: 'nav', ...props }} />, // prettier-ignore
   // nav: Nav,
 
   // --- SPECIAL COMPONENTS --- //
@@ -308,7 +342,11 @@ const components = {
           <components.header {...{ components, ...props }} />
           {children}
         </components.main>
-        <components.footer />
+        <components.footer {...{
+          children: components.Footer && <components.Footer {...{ components, ...props }} />,
+          components,
+          ...props
+        }} />
       </>
     );
   },
@@ -339,32 +377,57 @@ const components = {
           <components.header {...{ components, ...props }} />
           {children}
         </components.main>
-        <components.footer />
+        <components.footer {...{ children: components.Footer, components, ...props }} />
       </>
     );
+  },
+  wrapperComponentFromPage: ({ children, components, ...props }) => {
+    return children;
   },
   // Poko,
   // Preact,
   ImgLazy,
   NavPicoCss,
   Nav,
-  Menu: ({ children, components, ...props }) => {
-    const topLevelPages = props.pages
-      .filter(p => p.status === "published" && p.parents?.length === 1)
-      .map((p) => {
-        return {
-          title: p.props.title,
-          codeName: p.codeName,
-          href: p.props.href,
-        };
-      });
-    
-    
-    const index = topLevelPages?.find((p) => p.codeName === "index");
-    const pages = topLevelPages?.filter((p) => p.codeName !== "index");
+  MenuLevel1Pages: ({ children, components, poko, page, block }) => {
+    const topLevelPages = poko.pages
+      .filter(p => p.poko.page.status === "published" && p.poko.page.parents?.length === 1)
+      // .map((p) => {
+      //   return {
+      //     title: p.poko.page.title,
+      //     codeName: p.poko.page.codeName,
+      //     href: p.poko.page.href,
+      //     ...p.page.self
+      //   };
+      // });
+      
+    // console.log(topLevelPages)
+      
+    const index = topLevelPages?.find((p) => p.poko.page.codeName === "index");
+    const pages = topLevelPages?.filter((p) => p.poko.page.codeName !== "index");
       
     // return null
-    return <components.nav {...{ index, pages }} />;
+    // return <components.nav {...{ index, pages }} />;
+    const { subBlocks } = page;
+
+    return null
+
+    return (
+      <components.nav class="Menu MenuLevel1Pages" {...{ nav: {...subBlocks.nav, ...subBlocks.Menu?.nav}}}>
+        <components.div class="MenuLevel1Pages-left" {...{ div: {...subBlocks.div, ...subBlocks.menu?.div, ...subBlocks.menu?.left }}}>
+          {index && (index?.titleMenu || index?.title) && (
+              <components.a href={index.href}>{index?.titleMenu || index?.title}</components.a>
+          )}
+        </components.div>
+        <components.ul class="MenuLevel1Pages-right" {...{ ul: {...subBlocks.ul, ...subBlocks.menu?.ul, ...subBlocks.menu?.right }}}>
+          {pages && pages.map(({ href, title, codeName }) => (
+            <components.li {...{ li: {...subBlocks.li, ...subBlocks.menu?.li, ...subBlocks.menu?.right }}}>
+              <components.a {...{ href }}>{title || codeName}</components.a>
+            </components.li>
+          ))}
+        </components.ul>
+      </components.nav>
+    )
 
   },
   ChildPage: () => null,
