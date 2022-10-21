@@ -2,50 +2,48 @@
 // import Debug from 'astro/debug';
 // import { notionHelpers } from "@utils";
 // import * as _jsx_runtime from 'preact/jsx-runtime'
-import { SkeletonPage } from "@layouts";
-// import pokoComponents, { addProps } from "../components/components.jsx";
+import { SkeletonPage } from '@layouts';
+// import pokoComponents, { addPropsonComponents } from "../components/components.jsx";
 // import { toMdx } from '@services/notion.mjs'
 // import MDXBundler from "../components/MDXBundler.jsx";
 // import { bundleMDX } from "mdx-bundler";
 // import { getMDXExport } from "mdx-bundler/client/index.js";
-import { MDXRemote } from "next-mdx-remote";
-import remarkFrontmatter from "remark-frontmatter"; // YAML and such.
-import remarkMdxFrontmatter from "remark-mdx-frontmatter";
+import { MDXRemote } from 'next-mdx-remote';
+import remarkFrontmatter from 'remark-frontmatter'; // YAML and such.
+import remarkMdxFrontmatter from 'remark-mdx-frontmatter';
 // import remarkUnwrapImages from "remark-unwrap-images";
-import remarkGfm from "remark-gfm";
+import remarkGfm from 'remark-gfm';
 // import rehypeSlug from "rehype-slug";
-import * as preactRuntime from "preact/jsx-runtime";
+import * as preactRuntime from 'preact/jsx-runtime';
 // NOTE: for some reason `preact/jsx-runtime`does not yield the same export on `dev` ad `build` commands
 const runtime = preactRuntime.default || preactRuntime;
 
-
-import { serialize } from 'next-mdx-remote/serialize'
-import MDX from "@components/MDX"
+import { serialize } from 'next-mdx-remote/serialize';
+import MDX from '@components/MDX';
 
 const mdxOptions = {
-  ...runtime,
-  remarkPlugins: [
-    // [
-    //   remarkFrontmatter,
-    //   {
-    //     type: "yaml",
-    //     fence: { open: "```yaml", close: "```" },
-    //     // anywhere: true,
-    //   },
-    // ],
-    // remarkMdxFrontmatter,
-    // remarkUnwrapImages,
-    remarkGfm,
-  ],
-  rehypePlugins: [
-    // rehypeSlug
-  ],
-  format: 'mdx'
-}
+	...runtime,
+	remarkPlugins: [
+		// [
+		//   remarkFrontmatter,
+		//   {
+		//     type: "yaml",
+		//     fence: { open: "```yaml", close: "```" },
+		//     // anywhere: true,
+		//   },
+		// ],
+		// remarkMdxFrontmatter,
+		// remarkUnwrapImages,
+		remarkGfm,
+	],
+	rehypePlugins: [
+		// rehypeSlug
+	],
+	format: 'mdx',
+};
 
 const { href, pathname } = new URL(Astro.url.pathname, Astro.site);
-const { page, tree, globalStylesString, headString } =
-  Astro.props;
+const { page, tree, globalStylesString, headString } = Astro.props;
 const { md, props } = page;
 
 // console.log({ props })
@@ -58,26 +56,25 @@ const { md, props } = page;
 // const { code } = mdx
 
 const mdxSource = await serialize(
-  // md,
-  '# Hola',
-  {
-    // made available to the arguments of any custom mdx component
-    scope: {},
-    // MDX's available options, see the MDX docs for more info.
-    // https://mdxjs.com/packages/mdx/#compilefile-options
-    mdxOptions,
-    // Indicates whether or not to parse the frontmatter from the mdx source
-    parseFrontmatter: false,
-  }
-)
+	// md,
+	'# Hola',
+	{
+		// made available to the arguments of any custom mdx component
+		scope: {},
+		// MDX's available options, see the MDX docs for more info.
+		// https://mdxjs.com/packages/mdx/#compilefile-options
+		mdxOptions,
+		// Indicates whether or not to parse the frontmatter from the mdx source
+		parseFrontmatter: false,
+	}
+);
 
 // console.log(props.components)
-
 ---
 
 <SkeletonPage {...{ path: pathname, ...props}}>
-  <Fragment slot="head" set:html={headString} />
+	<Fragment slot="head" set:html={headString} />
 
-  <!-- {code ? <MDXBundler {...{ code, frontmatter: undefined, props }} /> : null} -->
-  <MDX {...{ mdxSource, scope: {}, props }} />
+	<!-- {code ? <MDXBundler {...{ code, frontmatter: undefined, props }} /> : null} -->
+	<MDX {...{ mdxSource, scope: {}, props }} />
 </SkeletonPage>

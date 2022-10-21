@@ -1,0 +1,15 @@
+---
+const { child } = Astro.props;
+const {
+	tag: Tag,
+	children,
+	...props
+} = typeof child === 'string' ? { tag: undefined, children: undefined } : child;
+
+const isCompDef = typeof Tag === 'string' && (children || Object.keys(props).length);
+const isString = typeof child === 'string';
+---
+
+<>
+	{isCompDef ? <Tag {...props}>{children}</Tag> : null}
+</>{isString ? <Fragment set:html={child} /> : null}

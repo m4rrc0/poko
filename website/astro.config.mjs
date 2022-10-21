@@ -1,16 +1,16 @@
 // Full Astro Configuration API Documentation:
 // https://astro.build/config
-import { defineConfig } from "astro/config";
+import { defineConfig } from 'astro/config';
 // import { loadEnv } from "vite";
-import "dotenv/config";
-import sitemap from "@astrojs/sitemap";
-import robotsTxt from "astro-robots-txt";
-import mdx from "@astrojs/mdx";
+import 'dotenv/config';
+import sitemap from '@astrojs/sitemap';
+import robotsTxt from 'astro-robots-txt';
+import mdx from '@astrojs/mdx';
 // import react from "@astrojs/react";
-import preact from "@astrojs/preact";
-import image from "@astrojs/image";
+import preact from '@astrojs/preact';
+import image from '@astrojs/image';
 
-import { viteCommonjs } from "@originjs/vite-plugin-commonjs";
+import { viteCommonjs } from '@originjs/vite-plugin-commonjs';
 // import mdx from "@mdx-js/rollup";
 // import { astroImageTools } from "astro-imagetools";
 // import mdx from "@astrojs/mdx";
@@ -47,7 +47,7 @@ export default defineConfig({
 		// image(),
 		image({
 			// logLevel: "debug",
-			serviceEntryPoint: "@astrojs/image/sharp", // useful after version 0.8.0 of @astrojs/image
+			serviceEntryPoint: '@astrojs/image/sharp', // useful after version 0.8.0 of @astrojs/image
 		}),
 		// fetchAhead(),
 		// astroImageTools,
