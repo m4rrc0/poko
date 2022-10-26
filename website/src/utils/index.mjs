@@ -38,6 +38,8 @@ export const slugifyPath = (codeName) => {
 	return { slug, path };
 };
 
+export const joinStrings = (arr, separator = ' ') => arr.filter((z) => z).join(separator);
+
 export function isObject(variable) {
 	return Object.prototype.toString.call(variable) === '[object Object]';
 }
@@ -188,8 +190,9 @@ export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
 				// isSelf && href ? { href } : {},
 				// isSelf && title ? { title } : {},
 				// Everything else is merged
-				title ? { title } : {},
+				typeof title !== 'undefined' ? { title } : {},
 				restProps,
+				isSelf && _self ? { ..._self } : {},
 			]);
 
 			const possibleComponentsAdded = Object.entries(propsPageMerged).reduce(

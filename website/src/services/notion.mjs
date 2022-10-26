@@ -35,7 +35,7 @@ const notion = new Client({ auth: NOTION_TOKEN });
 const n2m = new NotionToMarkdown({ notionClient: notion });
 
 n2m.setCustomTransformer('image', async (block) => {
-	const { image } = block;
+	const { image, id } = block;
 	if (image.type !== 'file') return null;
 
 	const originalUrl = image.file.url;
@@ -57,11 +57,11 @@ n2m.setCustomTransformer('image', async (block) => {
 		src: originalUrl,
 		alt,
 		format: type,
-		width,
-		height,
-		// quality: 90,
-		// aspectRatio: width / height,
-		// width: width > 2000 ? 2000 : width,
+		// width,
+		// height,
+		quality: 90,
+		aspectRatio: width / height,
+		width: width > 2000 ? 2000 : width,
 	});
 
 	// console.log({ i });
@@ -79,7 +79,7 @@ n2m.setCustomTransformer('image', async (block) => {
 
 	// console.log({ originalUrl, p, sources: p.sources });
 
-	return `<img src="${i.src}" alt="${i.alt}" width="${i.width}" height="${i.height}" />`;
+	return `<E.img data-id="${id}" src="${i.src}" alt="${i.alt}" width="${i.width}" height="${i.height}" />`;
 });
 
 n2m.setCustomTransformer('child_page', (blockRaw) => {

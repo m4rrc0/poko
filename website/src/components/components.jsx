@@ -6,7 +6,7 @@ import { visitParents } from 'unist-util-visit-parents';
 import _get from 'lodash.get';
 // import _merge from 'lodash.merge';
 import deepmerge from 'deepmerge';
-import { notionHelpers, simpleDeepMerge, isObject } from '@utils';
+import { notionHelpers, simpleDeepMerge, isObject, joinStrings } from '@utils';
 // import poko from "@poko";
 import Anon from '@components/Anon.jsx';
 // import { Img } from "astro-imagetools/components";
@@ -301,58 +301,60 @@ const Nav = ({ index, pages }) => {
 };
 
 // const CollectionWrapper = (props) => <div class="grid" {...props} />;
-const CollectionWrapper = ({ children, ...props }) => (
-	<div class="grid" style="--width-column: 14rem; --gap: 1rem;" {...props}>
-		<div>{children}</div>
-	</div>
-);
-const CollectionArticle = ({ poko, page, block, children }) => {
+const CollectionWrapper = ({ children, ...props }) => {
 	return (
-		<components.article
+		<E.div
+			{...{ ...props, class: 'CollectionWrapper'.concat(props?.class ? ` ${props?.class}` : '') }}
+		>
+			{children}
+		</E.div>
+	);
+};
+const CollectionArticle = ({ components, poko, page, block, children }) => {
+	return (
+		<E.article
 			{...{
 				poko,
 				page,
 				block,
-				['data-id']: poko.page.id,
+				['data-id']: poko.block.id,
 				// class: "box shadowy",
-				class: 'box no-border stack split-after-1 card-shadow breakout-clickable',
-				style: 'max-width: calc(var(--width-column) * 2); border-radius: 6px;',
+				class: 'CollectionArticle',
 			}}
 		>
 			{children}
-		</components.article>
+		</E.article>
 	);
 };
 const CollectionArticleFeaturedImage = ({ components, poko, page, block, featuredImage }) => {
 	// console.log({ featuredImage });
 	const fi = featuredImage?.[0] || featuredImage;
-	return fi ? <components.ImgLazy {...{ components, poko, page, block, ...fi?.image }} /> : null;
+	return fi ? (
+		<components.ImgLazy
+			{...{ components, poko, page, block, class: 'CollectionArticleFeaturedImage', ...fi?.image }}
+		/>
+	) : null;
 };
-const CollectionArticleHeading = ({ components, poko, page, block, href, heading }) => {
-	return href && heading ? (
-		<components.h2 {...{ components, poko, page, block }}>
-			<components.a
-				{...{ components, poko, page, block, href, class: `clickable`, style: `color: inherit;` }}
-			>
-				{heading}
-			</components.a>
-		</components.h2>
+const CollectionArticleHeading = ({ components, poko, page, block, href, title, tag = 'h2' }) => {
+	const El = E[tag] || E.h2;
+	return href && title ? (
+		<El {...{ components, poko, page, block, class: 'CollectionArticleHeading' }}>
+			<E.a {...{ components, poko, page, block, href, title, class: `CollectionArticleHeadingA` }}>
+				{title}
+			</E.a>
+		</El>
 	) : null;
 };
 const CollectionArticleFooter = ({ components, poko, page, block, datePublished, author }) => {
 	return datePublished || author ? (
-		<components.div
-			{...{ components, poko, page, block, class: 'cluster', style: '--gap-cluster: 1ch;' }}
-		>
+		<E.div {...{ components, poko, page, block, class: 'CollectionArticleFooter' }}>
 			{datePublished ? (
-				<components.p {...{ components, poko, page, block }}>
+				<E.p {...{ components, poko, page, block }}>
 					On <time datetime={datePublished}>{datePublished}</time>
-				</components.p>
+				</E.p>
 			) : null}
-			{author ? (
-				<components.p {...{ components, poko, page, block }}>by {author}</components.p>
-			) : null}
-		</components.div>
+			{author ? <E.p {...{ components, poko, page, block }}>by {author}</E.p> : null}
+		</E.div>
 	) : null;
 };
 // const ColumnsWrapper = (props) => <div class="grid" {...props} />;
@@ -370,6 +372,95 @@ const HeaderBlog = ({ components, poko, page, block, ...props }) => {
 	const datePublished = page.datePublished || ld.datePublished?.start;
 
 	// console.log({ featuredImage })
+
+	return (
+		<components.header
+			{...{ components, poko, page, block, class: 'stack', style: 'gap-stack: 1rem;' }}
+		>
+			{featuredImage ? (
+				<components.img {...{ components, poko, page, block, ...featuredImage.image }} />
+			) : null}
+			{datePublished || author ? (
+				<components.div
+					{...{ components, poko, page, block, class: 'cluster', style: '--gap-cluster: 1ch;' }}
+				>
+					{datePublished ? (
+						<components.p {...{ components, poko, page, block }}>
+							On <time datetime={datePublished}>{datePublished}</time>
+						</components.p>
+					) : null}
+					{author ? (
+						<components.p {...{ components, poko, page, block }}>by {author}</components.p>
+					) : null}
+				</components.div>
+			) : null}
+			{page.title && <h1>{page.title}</h1>}
+			<hr />
+		</components.header>
+	);
+};
+
+const HeaderProduct = ({ components, poko, page, block, ...props }) => {
+	const pokoProps = { components, poko, page, block };
+	console.log({ poko, page, block, ...props });
+	const { title, description, jsonld, gallery, price, _definition } = page || {};
+	const { canonicalUrl } = poko.page;
+	const ld = jsonld || {};
+	const featuredImage = page.featuredImage?.[0] || page.featuredImage || ld.image?.[0] || ld.image;
+	const author = page.author || ld.author?.name;
+	const datePublished = page.datePublished || ld.datePublished?.start;
+	const ID = page.id || page.ID || page.sku || page.title || poko.page.id;
+	const priceSymbol = _definition?.price?.number?.format === 'euro' ? '€' : '?';
+
+	// console.log({ featuredImage })
+
+	return (
+		title && (
+			<div class="with-sidebar right" style="--side-width: 25rem; --content-min: 30%;">
+				<div>
+					<div class="stack">
+						{featuredImage ? <components.ImgLazy {...{ ...pokoProps, ...featuredImage }} /> : null}
+						{gallery?.[0] && (
+							<div class="grid" style="--width-column: 4rem;">
+								<div>
+									{gallery.map((i) => (
+										<components.ImgLazy {...{ ...i }} />
+									))}
+								</div>
+							</div>
+						)}
+					</div>
+					<div>
+						<components.header {...{ ...pokoProps, ...props }}>
+							{title && <h1>{title}</h1>}
+						</components.header>
+						{price && (
+							<div class="cluster">
+								<div>
+									<p style="font-size: 1.17rem;">
+										{price}
+										{priceSymbol}
+									</p>
+									<button
+										class="snipcart-add-item"
+										data-item-name={title}
+										data-item-id={ID}
+										data-item-price={price}
+										data-item-description={description}
+										data-item-image={featuredImage.url}
+										data-item-url={canonicalUrl.href}
+										data-item-has-taxes-included
+									>
+										Ajouter au panier
+									</button>
+								</div>
+							</div>
+						)}
+					</div>
+				</div>
+			</div>
+		)
+	);
 
 	return (
 		<components.header
@@ -417,10 +508,14 @@ const Element = ({
 }) => {
 	if (!tag) return null;
 
+	// console.log(tag, page);
+
+	const notionId = rest?.['data-id'];
 	const pokoProps = { components, poko, page, block };
+	// const subBlocks = { ...page?.subBlocks, page }
 
 	const classNames = typeof className === 'string' ? className?.split(' ') : [];
-	let ss = ['all', tag, ...classNames];
+	let ss = ['all', tag, ...classNames, notionId];
 	if (typeof subSelectors === 'string') ss.push(subSelectors);
 	else if (Array.isArray(subSelectors)) ss.push(...subSelectors);
 
@@ -603,6 +698,7 @@ const components = {
 	},
 	LinkToPage: BlockToPage,
 	CollectionData: ({ components, poko, page, block, blockRaw }) => {
+		const pokoProps = { components, poko, page, block };
 		// NOTE: receives special prop: blockRaw
 		// const blockId = blockRaw.id
 		const parentPageId = blockRaw.parent?.page_id || blockRaw.parent?.collection_id;
@@ -617,8 +713,14 @@ const components = {
 		});
 
 		return collectionItems.length ? (
-			<components.CollectionWrapper>
+			<components.CollectionWrapper {...{ ...pokoProps }}>
 				{collectionItems.map(({ poko, page, block }) => {
+					const pokoPropsItem = {
+						...pokoProps,
+						block: page,
+					};
+					pokoPropsItem.poko.block = poko.page;
+
 					const ld = page.jsonld || {};
 					const featuredImage = page.featuredImage || ld.image?.[0] || ld.image;
 					const author = page.author || ld.author?.name || ld.author;
@@ -632,7 +734,7 @@ const components = {
 						page.dateModified ||
 						ld.dateModified?.start ||
 						ld.dateModified;
-					const heading = page.title?.string || page.title;
+					const title = page.title?.string || page.title;
 
 					// console.log({
 					//   propsItem,
@@ -645,34 +747,24 @@ const components = {
 					return page ? (
 						<components.CollectionArticle
 							{...{
-								components,
-								poko,
-								page,
-								block,
+								...pokoPropsItem,
 								featuredImage,
 								href: poko.page.href,
-								// heading: propsItem.title,
-								heading,
+								title,
 								datePublished,
 								author,
 							}}
 						>
-							<components.CollectionArticleFeaturedImage
-								{...{ components, poko, page, block, featuredImage }}
-							/>
+							<components.CollectionArticleFeaturedImage {...{ ...pokoPropsItem, featuredImage }} />
 							<components.CollectionArticleHeading
 								{...{
-									components,
-									poko,
-									page,
-									block,
+									...pokoPropsItem,
 									href: poko.page.href,
-									// heading: propsItem.title,
-									heading,
+									title,
 								}}
 							/>
 							<components.CollectionArticleFooter
-								{...{ components, poko, page, block, datePublished, author }}
+								{...{ ...pokoPropsItem, datePublished, author }}
 							/>
 						</components.CollectionArticle>
 					) : null;
@@ -856,6 +948,7 @@ const components = {
 		return <E.h1 {...{ ...allProps }}>{page.title}</E.h1>;
 	},
 	HeaderBlog,
+	HeaderProduct,
 	// Columns: () => <div>Hello Columns</div>,
 	// Columns: ({ blockId }) => {
 	//   const block = getBlock(websiteTree, blockId);

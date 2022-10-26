@@ -7,7 +7,7 @@ import Anon from '@components/Anon.jsx';
 
 const {
 	path,
-	subBlocks: { html: propsHtml = {}, head: propsHead = {}, body: propsBody = {} } = {},
+	subBlocks,
 	style = '',
 	head: headChildrenRaw = [], // Can be string, object (as component description) or an array of former types
 	body: bodyChildrenRaw = [], // Can be string, object (as component description) or an array of former types
@@ -25,6 +25,7 @@ const {
 	link, // An array of objects with properties corresponding to <link> attributes
 	...restMetadataRaw
 } = metadata || {};
+const { html: propsHtml = {}, head: propsHead = {}, body: propsBody = {} } = subBlocks || {};
 
 // Transform something like
 // const obj = { ogType: {tag: 'meta', property: "og:type", content: 'website'} }

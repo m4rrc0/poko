@@ -363,7 +363,7 @@ export async function getStaticPaths() {
 			console.warn(JSON.stringify(raw));
 		}
 		// Change defaults type or role for exceptions
-		if (node.type === 'page') {
+		if (node.type === 'page' || node.type === 'collection') {
 			// Can be a page or a database
 			if (raw.codeName.startsWith('_')) {
 				node.role = 'container';
@@ -372,6 +372,8 @@ export async function getStaticPaths() {
 			if (!node.children) {
 				node.role = 'preview';
 			}
+			// Notion pages as components
+			// Must override the role 'container'
 			if (
 				raw.codeName === '_components' &&
 				(raw.parentId === rootID || raw.parentId === pageForComponentsId)
@@ -689,7 +691,20 @@ export async function getStaticPaths() {
 			//   console.log({ role: block.role, blockProps: block.blockProps});
 			// }
 
-			const inlineMd = await notionBlockToMd(block.raw);
+			let inlineMd;
+			if (block.role === 'synced_block') {
+				let list = [];
+				await Promise.all(
+					block.children.map(async (c) => {
+						const childInlineMd = await notionBlockToMd(c.raw);
+						list.push(childInlineMd);
+					})
+				);
+				inlineMd = list.join('\n\n');
+			} else {
+				inlineMd = await notionBlockToMd(block.raw);
+			}
+
 			block.inlineMd = inlineMd;
 			// console.log(block?.raw?.[rawType]?.rich_text)
 
