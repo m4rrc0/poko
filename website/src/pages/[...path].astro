@@ -170,25 +170,30 @@ export async function getStaticPaths() {
 
 						await Promise.all(
 							currentProp?.files?.map(async (f, i) => {
-								// TODO HERE
-								const commons = {
-									last_edited_time: p.last_edited_time,
-									blockId: p.id,
-								};
-
+								// TODO: handle external files and images
 								// const oType = raw.file?.type;
 								const originalUrl = f.file?.url;
 								const { filename, extension } = parseFileUrl(originalUrl);
+								const slug = filename.replaceAll('.', '_');
 
-								// console.log(extension);
+								const className = key;
+								const dataId = `${p.id}_${key}_${slug}`;
 
-								let propertyType;
-								let url;
-								let image;
+								f.last_edited_time = p.last_edited_time;
+								f.blockId = p.id;
+								f.pageId = p.id;
+								f.originalUrl = originalUrl;
+								f.filename = filename;
+								f.extension = extension;
+
+								let propertyRole;
+								// let url;
+								let img;
 								let file;
 
 								// Images processing
 								if (/jpeg|jpg|png|webp|gif|avif|tiff|svg/i.test(extension)) {
+									const extensionRe = new RegExp(`${extension}$`);
 									const {
 										width,
 										height,
@@ -199,76 +204,49 @@ export async function getStaticPaths() {
 
 									// console.log({ type, mime });
 
-									image = await getImage({
-										// src: originalUrl,
-										// // alt,
-										// format: type,
-										// quality: 90,
-										// aspectRatio: width / height,
-										// width: width > 2000 ? 2000 : width,
-										// // height,
-
+									img = await getImage({
 										// initial properties
 										src: originalUrl,
 										format: type,
-										width,
-										height,
+										quality: 90,
+										width: width > 2000 ? 2000 : width,
+										aspectRatio: width / height,
 									});
 
-									propertyType = 'image';
-									url = image.src;
+									propertyRole = 'image';
+									f.url = img.src;
 
-									image.last_edited_time = p.last_edited_time;
-									image.blockId = p.id;
-									image.pageId = p.id;
-									image.originalUrl = originalUrl;
-									image.filename = filename;
-									image.extension = extension;
-									image.url = url;
-
-									// console.log({ image });
+									// img.last_edited_time = p.last_edited_time;
+									// img.blockId = p.id;
+									// img.pageId = p.id;
+									// img.class = key;
+									// img['data-id'] = `${p.id}_${key}_${slug}`;
+									// img.originalUrl = originalUrl;
+									// img.filename = filename;
+									// img.extension = extension;
+									// img.url = url;
+									img.class = className;
+									img['data-id'] = dataId;
+									img.alt =
+										f.name.replace(extensionRe, '').replace(/_|-/g, ' ').replace(/\s+/g, ' ') || '';
 
 									// return `<img src="${i.src}" alt="${i.alt}" width="${i.width}" height="${i.height}" />`;
 								} else {
-									propertyType = 'file';
-									url = `/${dirUserAssets}/${filename}`;
+									propertyRole = 'file';
+									f.url = `/${dirUserAssets}/${filename}`;
 									file = {
-										...commons,
-										// remoteUrl,
-										originalUrl,
-										filename,
-										extension,
-										url,
+										href: f.url,
+										download: filename,
+										class: className,
+										['data-id']: dataId,
 									};
 
-									allFiles.push(file);
+									allFiles.push(f);
 								}
 
-								// p.properties[key].files[i].type = propertyType
-								f.type = propertyType;
-								// f.last_edited_time = p.last_edited_time
-								// f.blockId = p.id
-								// f.pageId = p.id
-								// f.originalUrl = originalUrl
-								// f.filename = filename
-								// f.extension = extension
-								// f.url = url
-								f.image = image;
+								f.role = propertyRole;
+								f.img = img;
 								f.file = file;
-
-								// console.log(f)
-
-								// return {
-								//   name: f.name,
-								//   type: propertyType,
-								//   ...commons,
-								//   originalUrl,
-								//   filename,
-								//   extension,
-								//   url,
-								//   image,
-								//   file
-								// }
 							})
 						);
 						// console.log({ firstFileAfter: currentProp.files[0] })
@@ -437,7 +415,7 @@ export async function getStaticPaths() {
 				(raw.properties &&
 					Object.entries(raw.properties).map(([key, val]) => {
 						// Transform page properties.
-						const prop = transformProp([key, val], node.role);
+						const prop = transformProp([key, val], node.type);
 						presets = [...presets, ...getPresets(prop)];
 						// Save files in our global 'allFiles' array
 						// if (val.type === "files" && !prop._definition) {

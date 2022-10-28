@@ -226,22 +226,24 @@ const ImgLazy = ({
 	width,
 	height,
 	onload,
+	class: className,
+	img: { class: classNameImg, ...img } = {},
+	...props
 }) => {
+	const pokoProps = { components, poko, page, block };
 	return (
-		<E.div {...{ components, poko, page, block, class: 'img-lazy-wrapper' }}>
+		<E.div {...{ ...pokoProps, class: 'ImgLazyWrapper' + (className ? ` ${className}` : '') }}>
 			<E.img
 				{...{
-					components,
-					poko,
-					page,
-					block,
+					...pokoProps,
 					src,
 					alt,
-					loading: 'lazy',
 					width,
 					height,
-					// ..._img,
-					class: `img-lazy`,
+					loading: 'lazy',
+					...props,
+					...img,
+					class: `ImgLazy` + (classNameImg ? ` ${classNameImg}` : ''),
 					onload: `this.parentNode.style.backgroundColor = 'transparent';this.style.opacity = 1;${
 						onload || ''
 					}`,
@@ -310,7 +312,7 @@ const CollectionWrapper = ({ children, ...props }) => {
 		</E.div>
 	);
 };
-const CollectionArticle = ({ components, poko, page, block, children }) => {
+const CollectionArticle = ({ components, poko, page, block, children, ...props }) => {
 	return (
 		<E.article
 			{...{
@@ -319,7 +321,8 @@ const CollectionArticle = ({ components, poko, page, block, children }) => {
 				block,
 				['data-id']: poko.block.id,
 				// class: "box shadowy",
-				class: 'CollectionArticle',
+				...props,
+				class: `CollectionArticle ${props.class || ''}`,
 			}}
 		>
 			{children}
@@ -331,7 +334,7 @@ const CollectionArticleFeaturedImage = ({ components, poko, page, block, feature
 	const fi = featuredImage?.[0] || featuredImage;
 	return fi ? (
 		<components.ImgLazy
-			{...{ components, poko, page, block, class: 'CollectionArticleFeaturedImage', ...fi?.image }}
+			{...{ components, poko, page, block, class: 'CollectionArticleFeaturedImage', ...fi?.img }}
 		/>
 	) : null;
 };
@@ -378,7 +381,7 @@ const HeaderBlog = ({ components, poko, page, block, ...props }) => {
 			{...{ components, poko, page, block, class: 'stack', style: 'gap-stack: 1rem;' }}
 		>
 			{featuredImage ? (
-				<components.img {...{ components, poko, page, block, ...featuredImage.image }} />
+				<components.img {...{ components, poko, page, block, ...featuredImage.img }} />
 			) : null}
 			{datePublished || author ? (
 				<components.div
@@ -402,7 +405,6 @@ const HeaderBlog = ({ components, poko, page, block, ...props }) => {
 
 const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 	const pokoProps = { components, poko, page, block };
-	console.log({ poko, page, block, ...props });
 	const { title, description, jsonld, gallery, price, _definition } = page || {};
 	const { canonicalUrl } = poko.page;
 	const ld = jsonld || {};
@@ -412,51 +414,218 @@ const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 	const ID = page.id || page.ID || page.sku || page.title || poko.page.id;
 	const priceSymbol = _definition?.price?.number?.format === 'euro' ? '€' : '?';
 
-	// console.log({ featuredImage })
-
 	return (
 		title && (
-			<div class="with-sidebar right" style="--side-width: 25rem; --content-min: 30%;">
+			<div class="with-sidebar right" style="--width-sidebar: 25rem; --content-min: 40%;">
+				<div class="stack">
+					{featuredImage ? (
+						<components.ImgLazy {...{ ...pokoProps, ...featuredImage.img }} />
+					) : null}
+					{gallery?.[0] && (
+						<>
+							<div class="gallery grid" style="--width-column-min: 2rem;">
+								{gallery.map(({ img }, i) => {
+									const first = i === 0;
+									const last = i === gallery.length - 1;
+									return (
+										<>
+											<components.button
+												{...{
+													...pokoProps,
+													['aria-label']: 'open image zoom',
+													style: ``,
+													// onclick: `const m = document.getElementById("gallery-modal-${i}");m.style.display = m.style.display === 'initial' ? 'none' : 'initial';`,
+													// onclick: `openModal('gallery-modal-${i}')`,
+													onclick: `openModal(${i})`,
+												}}
+											>
+												<components.ImgLazy
+													{...{ ...pokoProps, ...img, id: `gallery-image-${i}` }}
+												/>
+											</components.button>
+											{/* <div class="modal cp- imposter fixed" id={`gallery-modal-${i}`}>
+												<div class="modal-content stack">
+													<div class="ImgLazyWrapper">
+														<img
+															{...{
+																loading: 'lazy',
+																...img,
+																class: `ImgLazy`,
+																onload: `this.parentNode.style.backgroundColor = 'transparent';this.style.opacity = 1;`,
+															}}
+														/>
+													</div>
+													<div class="modal-buttons cluster">
+														<button
+															disabled={first}
+															onclick={`openModal('gallery-modal-${i - 1}')`}
+														>
+															Précédent
+														</button>
+														<button onclick={`closeModal()`}>Fermer</button>
+														<button disabled={last} onclick={`openModal('gallery-modal-${i + 1}')`}>
+															Suivant
+														</button>
+													</div>
+												</div>
+											</div> */}
+											{/* <components.div
+												{...{
+													...pokoProps,
+													id: `gallery-modal-${i}`,
+													class: `modal cp- imposter fixed ${img.class || ''}`,
+												}}
+											>
+												<components.div {...{ ...pokoProps, class: `modal-content stack` }}>
+													<components.ImgLazy
+														{...{
+															...pokoProps,
+															...img,
+															class: `${img.class || ''}`,
+														}}
+													/>
+													<components.div class="modal-buttons cluster" style="">
+														<components.button
+															{...{
+																...pokoProps,
+																disabled: first,
+																onclick: `openModal('gallery-modal-${i - 1}')`,
+															}}
+														>
+															Précédent
+														</components.button>
+														<components.button {...{ ...pokoProps, onclick: `closeModal()` }}>
+															Fermer
+														</components.button>
+														<components.button
+															{...{
+																...pokoProps,
+																disabled: last,
+																onclick: `openModal('gallery-modal-${i + 1}')`,
+															}}
+														>
+															Suivant
+														</components.button>
+													</components.div>
+												</components.div>
+											</components.div> */}
+										</>
+									);
+									return (
+										<components.a {...{ href: img.src, target: '_blank', ...pokoProps }}>
+											<components.ImgLazy {...{ ...pokoProps, ...img }} />
+										</components.a>
+									);
+								})}
+							</div>
+							<style>{`
+							.gallery.grid > button { background:none;border:none;padding:0; }
+							.gallery.grid  .modal { block-size:100%;inline-size:100%;background:rgba(255,255,255,0.9);z-index:1; }
+							.modal-content, .modal-buttons { justify-content: center; }
+							.modal-buttons > button { padding-inline: 1rem; }
+						`}</style>
+							<script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=Element.prototype.inert,Map,Set,Element.prototype.matches,Node.prototype.contains"></script>
+							<script
+								dangerouslySetInnerHTML={{
+									__html: `
+									// let modalOpened = null
+									const gallery = document.querySelector('.gallery.grid');
+									let modal = null
+									// let allElems = document.querySelectorAll('body *:not([inert]):not(.modal):not(.modal *)');
+
+									const modalTemplate = document.createElement('div');
+									modalTemplate.setAttribute('class', 'modal cp- imposter fixed')
+									modalTemplate.setAttribute('aria-label', 'image zoom')
+									modalTemplate.innerHTML = \`
+										<div class="modal-content stack">
+											<!-- Image goes here -->
+											<div class="modal-buttons cluster">
+												<button class="gallery-modal-button-prev">
+													Précédent
+												</button>
+												<button onclick="closeModal()">Fermer</button>
+												<button class="gallery-modal-button-next">
+													Suivant
+												</button>
+											</div>
+										</div>
+									\`
+
+									const openModal = (i) => {
+										if (modal) closeModal()
+
+										// allElems = document.querySelectorAll('body > *:not([inert]):not(#' + id + ')');
+
+										// const img = document.querySelector('.gallery.grid > :nth-child($ {i}) > img')
+
+										// Array.prototype.forEach.call(allElems, elem => {
+										// 	elem.setAttribute('inert', 'inert')
+										// })
+
+										// modalOpened = document.getElementById(id)
+										// modalOpened.style.display = 'initial'
+										// modalOpened = id
+
+										const targetImage = gallery.querySelector('#gallery-image-' + i);
+										if (!targetImage) return null;
+										const prevImage = gallery.querySelector('#gallery-image-' + (i - 1)); 
+										const nextImage = gallery.querySelector('#gallery-image-' + (i + 1));
+
+										const imageClone = targetImage.cloneNode(true);
+										modal = modalTemplate.cloneNode(true);
+										modal.querySelector('.modal-content').prepend(imageClone);
+										const buttonPrev = modal.querySelector('.gallery-modal-button-prev');
+										buttonPrev.setAttribute('onclick', 'openModal(' + (i - 1) + ')');
+										if (!prevImage) buttonPrev.setAttribute('disabled', 'disabled');
+										const buttonNext = modal.querySelector('.gallery-modal-button-next');
+										buttonNext.setAttribute('onclick', 'openModal(' + (i + 1) + ')');
+										if (!nextImage) buttonNext.setAttribute('disabled', 'disabled');
+										
+										gallery.append(modal)
+									}
+									const closeModal = () => {
+										// const currentModal = document.getElementById(modalOpened)
+
+										// Array.prototype.forEach.call(allElems, elem => {
+										// 	elem.removeAttribute('inert')
+										// })
+
+										// modalOpened.style.display = 'none'
+										// modalOpened = null
+										// allElems = []
+
+										modal.remove()
+									}
+								`,
+								}}
+							></script>
+						</>
+					)}
+				</div>
 				<div>
-					<div class="stack">
-						{featuredImage ? <components.ImgLazy {...{ ...pokoProps, ...featuredImage }} /> : null}
-						{gallery?.[0] && (
-							<div class="grid" style="--width-column: 4rem;">
-								<div>
-									{gallery.map((i) => (
-										<components.ImgLazy {...{ ...i }} />
-									))}
-								</div>
-							</div>
-						)}
-					</div>
-					<div>
-						<components.header {...{ ...pokoProps, ...props }}>
-							{title && <h1>{title}</h1>}
-						</components.header>
-						{price && (
-							<div class="cluster">
-								<div>
-									<p style="font-size: 1.17rem;">
-										{price}
-										{priceSymbol}
-									</p>
-									<button
-										class="snipcart-add-item"
-										data-item-name={title}
-										data-item-id={ID}
-										data-item-price={price}
-										data-item-description={description}
-										data-item-image={featuredImage.url}
-										data-item-url={canonicalUrl.href}
-										data-item-has-taxes-included
-									>
-										Ajouter au panier
-									</button>
-								</div>
-							</div>
-						)}
-					</div>
+					<components.header {...{ ...pokoProps, ...props }}>
+						{title && <h1>{title}</h1>}
+					</components.header>
+					{price && (
+						<div class="cluster">
+							<p style="font-size: 1.17rem;">
+								{price}
+								{priceSymbol}
+							</p>
+							<components.button
+								class="snipcart-add-item"
+								data-item-name={title}
+								data-item-id={ID}
+								data-item-price={price}
+								data-item-description={description}
+								data-item-image={featuredImage.url}
+								data-item-url={canonicalUrl.href}
+								data-item-has-taxes-included
+							>
+								Ajouter au panier
+							</components.button>
+						</div>
+					)}
 				</div>
 			</div>
 		)
@@ -467,7 +636,7 @@ const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 			{...{ components, poko, page, block, class: 'stack', style: 'gap-stack: 1rem;' }}
 		>
 			{featuredImage ? (
-				<components.img {...{ components, poko, page, block, ...featuredImage.image }} />
+				<components.img {...{ components, poko, page, block, ...featuredImage.img }} />
 			) : null}
 			{datePublished || author ? (
 				<components.div
@@ -586,7 +755,7 @@ const elementsTags = ['div','a','blockquote','br','code','em','h1','h2','h3','h4
   // With remark-gfm (see guide) you can also use:
   'del','input','section','sup','table','tbody','td','th','thead','tr',
 	// Other normal elements
-  'main','footer','header','aside','article','nav','label','form',]
+  'main','footer','header','aside','article','nav','label','form', 'button']
 
 const E = elementsTags.reduce(
 	(prev, curr) => ({
@@ -698,7 +867,7 @@ const components = {
 	},
 	LinkToPage: BlockToPage,
 	CollectionData: ({ components, poko, page, block, blockRaw }) => {
-		const pokoProps = { components, poko, page, block };
+		const pokoPropsCollection = { components, poko, page, block };
 		// NOTE: receives special prop: blockRaw
 		// const blockId = blockRaw.id
 		const parentPageId = blockRaw.parent?.page_id || blockRaw.parent?.collection_id;
@@ -713,13 +882,17 @@ const components = {
 		});
 
 		return collectionItems.length ? (
-			<components.CollectionWrapper {...{ ...pokoProps }}>
+			<components.CollectionWrapper {...{ ...pokoPropsCollection }}>
 				{collectionItems.map(({ poko, page, block }) => {
 					const pokoPropsItem = {
-						...pokoProps,
+						components,
+						poko: {
+							page: pokoPropsCollection.poko.page,
+							block: poko.page,
+						},
+						page: pokoPropsCollection.page,
 						block: page,
 					};
-					pokoPropsItem.poko.block = poko.page;
 
 					const ld = page.jsonld || {};
 					const featuredImage = page.featuredImage || ld.image?.[0] || ld.image;
@@ -788,7 +961,7 @@ const components = {
 
 		return (
 			<components.header {...{ ...allProps, class: 'stack', style: '--gap-stack: 1rem;' }}>
-				{featuredImage ? <components.ImgLazy {...{ ...allProps, ...featuredImage.image }} /> : null}
+				{featuredImage ? <components.ImgLazy {...{ ...allProps, ...featuredImage.img }} /> : null}
 				{datePublished || author ? (
 					<components.div {...{ ...allProps, class: 'cluster', style: '--gap-cluster: 1ch;' }}>
 						{datePublished ? (
@@ -813,8 +986,9 @@ const components = {
 		collectionId,
 		id,
 		placeholder = 'search',
-		searchbar, // useful if some properties are defined on the page level
+		...props
 	}) => {
+		const pokoProps = { components, poko, page, block };
 		const collectionIdNoHyphens = collectionId.replaceAll('-', '');
 		const items = poko.pages.filter(({ poko, page, block }) => {
 			const lastParent = poko.page.parents?.[poko.page.parents?.length - 1];
@@ -852,13 +1026,17 @@ const components = {
 		//   };
 		// });
 
-		const matchingItems = items?.map((item) => {
-			const str = [item.codeName].join(' ').toLowerCase();
+		const matchingItems = items?.map(({ poko, page, block }) => {
+			// NOTE: we could add multiple matchable strings and join them here
+			// const str = [poko.page.codeName].join(' ').toLowerCase();
+			const str = [poko.page.codeName].join(' ');
 			return {
-				id: item.id,
+				// href: item.poko.page.href,
+				id: poko.page.id,
 				str,
 			};
 		});
+		console.log(matchingItems);
 
 		return (
 			<>
@@ -868,15 +1046,13 @@ const components = {
 					//   __html: stylesForChildren,
 					// }}
 				/>
-				<components.div {...{ components, poko, page, block, ...searchbar, class: 'searchbar' }}>
+				<components.div {...{ ...pokoProps, ...props, class: `SearchBar ${props.class || ''}` }}>
 					{placeholder && (
 						<components.label
 							{...{
-								components,
-								poko,
-								page,
-								block,
+								...pokoProps,
 								htmlFor: inputId,
+								class: `SearchBarLabel`,
 								style: {
 									position: 'absolute',
 									left: '-10000px',
@@ -892,11 +1068,9 @@ const components = {
 					)}
 					<components.input
 						{...{
-							components,
-							poko,
-							page,
-							block,
+							...pokoProps,
 							id: inputId,
+							class: `SearchBarInput`,
 							name: 'search',
 							type: 'text',
 							placeholder: placeholder || '',
@@ -909,10 +1083,13 @@ const components = {
 							oninput: `
                 const stylesEl = document.getElementById("${styleId}");
   
-                const val = this.value.toLowerCase();
+                const val = this.value || '';
+				const valRe = new RegExp(val, 'i');
                 const matchingArray = JSON.parse(this.dataset.matchingArray);
                 const doNotMatchSelector = matchingArray
-                  .filter(({str}) => !str.match(val))
+                  .filter(({str}) => {
+					console.log({ str, val, match: valRe.test(str) });
+					return !valRe.test(str)})
                   .map(({id}) => '[data-id="' + id + '"]')
                   .join(",");
                 

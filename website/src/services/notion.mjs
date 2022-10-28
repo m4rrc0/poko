@@ -501,7 +501,7 @@ export const stringToVarName = (_str) => {
 	return str;
 };
 
-export function transformProp([_key, _val] = [], role) {
+export function transformProp([_key, _val] = [], nodeType) {
 	// let key = stringToVarName(_key);
 	let key = _key;
 	// name === _key
@@ -510,7 +510,7 @@ export function transformProp([_key, _val] = [], role) {
 	const { id, name, type } = _val;
 	let val = _val[type];
 
-	if (role === 'collection') {
+	if (nodeType === 'collection') {
 		key = `_definition.${_key}`;
 		val = _val;
 	} else if (type === 'title' || type === 'rich_text') {
