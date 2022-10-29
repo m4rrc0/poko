@@ -425,125 +425,65 @@ const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 						<>
 							<div class="gallery grid" style="--width-column-min: 2rem;">
 								{gallery.map(({ img }, i) => {
-									const first = i === 0;
-									const last = i === gallery.length - 1;
 									return (
-										<>
-											<components.button
-												{...{
-													...pokoProps,
-													['aria-label']: 'open image zoom',
-													style: ``,
-													// onclick: `const m = document.getElementById("gallery-modal-${i}");m.style.display = m.style.display === 'initial' ? 'none' : 'initial';`,
-													// onclick: `openModal('gallery-modal-${i}')`,
-													onclick: `openModal(${i})`,
-												}}
-											>
-												<components.ImgLazy
-													{...{ ...pokoProps, ...img, id: `gallery-image-${i}` }}
-												/>
-											</components.button>
-											{/* <div class="modal cp- imposter fixed" id={`gallery-modal-${i}`}>
-												<div class="modal-content stack">
-													<div class="ImgLazyWrapper">
-														<img
-															{...{
-																loading: 'lazy',
-																...img,
-																class: `ImgLazy`,
-																onload: `this.parentNode.style.backgroundColor = 'transparent';this.style.opacity = 1;`,
-															}}
-														/>
-													</div>
-													<div class="modal-buttons cluster">
-														<button
-															disabled={first}
-															onclick={`openModal('gallery-modal-${i - 1}')`}
-														>
-															Précédent
-														</button>
-														<button onclick={`closeModal()`}>Fermer</button>
-														<button disabled={last} onclick={`openModal('gallery-modal-${i + 1}')`}>
-															Suivant
-														</button>
-													</div>
-												</div>
-											</div> */}
-											{/* <components.div
-												{...{
-													...pokoProps,
-													id: `gallery-modal-${i}`,
-													class: `modal cp- imposter fixed ${img.class || ''}`,
-												}}
-											>
-												<components.div {...{ ...pokoProps, class: `modal-content stack` }}>
-													<components.ImgLazy
-														{...{
-															...pokoProps,
-															...img,
-															class: `${img.class || ''}`,
-														}}
-													/>
-													<components.div class="modal-buttons cluster" style="">
-														<components.button
-															{...{
-																...pokoProps,
-																disabled: first,
-																onclick: `openModal('gallery-modal-${i - 1}')`,
-															}}
-														>
-															Précédent
-														</components.button>
-														<components.button {...{ ...pokoProps, onclick: `closeModal()` }}>
-															Fermer
-														</components.button>
-														<components.button
-															{...{
-																...pokoProps,
-																disabled: last,
-																onclick: `openModal('gallery-modal-${i + 1}')`,
-															}}
-														>
-															Suivant
-														</components.button>
-													</components.div>
-												</components.div>
-											</components.div> */}
-										</>
-									);
-									return (
-										<components.a {...{ href: img.src, target: '_blank', ...pokoProps }}>
-											<components.ImgLazy {...{ ...pokoProps, ...img }} />
+										<components.a
+											{...{
+												...pokoProps,
+												class: `gallery-item button`,
+												id: `gallery-item-${i}`,
+												['aria-label']: 'open image zoom',
+												href: img.src, // Gets removed on DOMContentLoaded
+												target: '_blank', // Gets removed on DOMContentLoaded
+												// role: button best practices as per: https://www.w3.org/TR/2016/WD-wai-aria-practices-1.1-20160317/examples/button/button.html
+												// onclick: `openModal(${i})`, // addEventListener on DOMContentLoaded
+												// onkeydown: `openModal(${i})`, // addEventListener on DOMContentLoaded
+												// tabindex: "0", // Gets added on DOMContentLoaded
+												// role: "button" // Gets added on DOMContentLoaded
+											}}
+										>
+											<components.ImgLazy {...{ ...pokoProps, ...img, id: `gallery-image-${i}` }} />
 										</components.a>
 									);
 								})}
 							</div>
 							<style>{`
-							.gallery.grid > button { background:none;border:none;padding:0; }
-							.gallery.grid  .modal { block-size:100%;inline-size:100%;background:rgba(255,255,255,0.9);z-index:1; }
+							.gallery.grid > .gallery-item { background:none;border:none;padding:0; }
+							.modal { block-size:100%;inline-size:100%;background:rgba(255,255,255,0.9);z-index:1;margin:0!important;overscroll-behavior:contain; }
 							.modal-content, .modal-buttons { justify-content: center; }
 							.modal-buttons > button { padding-inline: 1rem; }
 						`}</style>
-							<script src="https://cdn.polyfill.io/v2/polyfill.min.js?features=Element.prototype.inert,Map,Set,Element.prototype.matches,Node.prototype.contains"></script>
+							<script
+								async
+								src="https://cdn.polyfill.io/v2/polyfill.min.js?features=Element.prototype.inert,Map,Set,Element.prototype.matches,Node.prototype.contains"
+							></script>
 							<script
 								dangerouslySetInnerHTML={{
 									__html: `
-									// let modalOpened = null
-									const gallery = document.querySelector('.gallery.grid');
-									let modal = null
-									// let allElems = document.querySelectorAll('body *:not([inert]):not(.modal):not(.modal *)');
+									// Keep after initialization
+									let gallery = null;
+									let allElems = null;
+									let modalTemplate = null;
+									let galleryMaxIndex = null;
+									// nullify on close modal
+									let initialBodyOverflow = null;
+									let focusedElementBefore = null;
+									let modal = null;
+									let imageModal = null;
+									let buttonClose = null;
+									let buttonPrev = null;
+									let buttonNext = null;
 
-									const modalTemplate = document.createElement('div');
+									modalTemplate = document.createElement('div');
 									modalTemplate.setAttribute('class', 'modal cp- imposter fixed')
 									modalTemplate.setAttribute('aria-label', 'image zoom')
 									modalTemplate.innerHTML = \`
-										<div class="modal-content stack">
+										<div class="modal-content stack center intrinsic">
 											<!-- Image goes here -->
 											<div class="modal-buttons cluster">
 												<button class="gallery-modal-button-prev">
 													Précédent
 												</button>
-												<button onclick="closeModal()">Fermer</button>
+												<button class="gallery-modal-button-close" onclick="closeModal()">Fermer</button>
 												<button class="gallery-modal-button-next">
 													Suivant
 												</button>
@@ -551,50 +491,108 @@ const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 										</div>
 									\`
 
+									const documentSetup = () => {
+										gallery = document.querySelector('.gallery.grid');
+										allElems = document.querySelectorAll('body > *:not([inert])');
+
+										const imageLinks = gallery.querySelectorAll('a.gallery-item')
+										for (const [i, imageLink] of imageLinks.entries()) {
+											imageLink.removeAttribute('href');
+											imageLink.removeAttribute('target');
+											imageLink.setAttribute('tabindex', '0');
+											imageLink.setAttribute('role', 'button');
+
+											imageLink.addEventListener('click', () => openModal(i));
+											imageLink.addEventListener('keydown', e => {
+												if (e.keyCode === 13 || e.keyCode === 32) { // enter or space
+													openModal(i);
+      												e.preventDefault();
+												}
+											})
+										}
+										galleryMaxIndex = imageLinks.length - 1
+									}
+
 									const openModal = (i) => {
 										if (modal) closeModal()
+										initialBodyOverflow = document.body.style.overflow;
+										focusedElementBefore = document.activeElement;
 
-										// allElems = document.querySelectorAll('body > *:not([inert]):not(#' + id + ')');
+										Array.prototype.forEach.call(allElems, elem => {
+											elem.setAttribute('inert', 'inert')
+										})
 
-										// const img = document.querySelector('.gallery.grid > :nth-child($ {i}) > img')
-
-										// Array.prototype.forEach.call(allElems, elem => {
-										// 	elem.setAttribute('inert', 'inert')
-										// })
-
-										// modalOpened = document.getElementById(id)
-										// modalOpened.style.display = 'initial'
-										// modalOpened = id
-
-										const targetImage = gallery.querySelector('#gallery-image-' + i);
-										if (!targetImage) return null;
-										const prevImage = gallery.querySelector('#gallery-image-' + (i - 1)); 
-										const nextImage = gallery.querySelector('#gallery-image-' + (i + 1));
-
-										const imageClone = targetImage.cloneNode(true);
 										modal = modalTemplate.cloneNode(true);
-										modal.querySelector('.modal-content').prepend(imageClone);
-										const buttonPrev = modal.querySelector('.gallery-modal-button-prev');
-										buttonPrev.setAttribute('onclick', 'openModal(' + (i - 1) + ')');
-										if (!prevImage) buttonPrev.setAttribute('disabled', 'disabled');
-										const buttonNext = modal.querySelector('.gallery-modal-button-next');
-										buttonNext.setAttribute('onclick', 'openModal(' + (i + 1) + ')');
-										if (!nextImage) buttonNext.setAttribute('disabled', 'disabled');
+										// Buttons
+										buttonClose = modal.querySelector('.gallery-modal-button-close');
+										buttonPrev = modal.querySelector('.gallery-modal-button-prev');
+										buttonNext = modal.querySelector('.gallery-modal-button-next');
+
+										document.body.appendChild(modal);
+										buttonClose.focus();
+
+										modal.addEventListener('keydown', e => {
+											if (e.keyCode === 27) { // Esc
+												e.preventDefault();
+												closeModal();
+											}
+										})
 										
-										gallery.append(modal)
+										document.body.style.overflow = "hidden";
+										prependImageModal(i);
 									}
+
+									const prependImageModal = (i) => {
+										const targetImage = gallery.querySelector('#gallery-image-' + i);
+										if (!targetImage) {
+											closeModal();
+											return null
+										};
+
+										buttonPrev.setAttribute('onclick', 'prependImageModal(' + (i - 1) + ')');
+										buttonNext.setAttribute('onclick', 'prependImageModal(' + (i + 1) + ')');
+										if (i <= 0) {
+											buttonPrev.setAttribute('disabled', 'disabled');
+											buttonClose.focus();
+										} else {
+											buttonPrev.removeAttribute('disabled');
+										}
+										if (i >= galleryMaxIndex) {
+											buttonNext.setAttribute('disabled', 'disabled');
+											buttonClose.focus();
+										} else {
+											buttonNext.removeAttribute('disabled');
+										}
+
+										if (imageModal) {
+											imageModal.remove();
+											imageModal = null;
+										}
+
+										imageModal = targetImage.cloneNode(true);
+										modal.querySelector('.modal-content').prepend(imageModal);
+									}
+
 									const closeModal = () => {
-										// const currentModal = document.getElementById(modalOpened)
+										document.body.style.overflow = initialBodyOverflow;
 
-										// Array.prototype.forEach.call(allElems, elem => {
-										// 	elem.removeAttribute('inert')
-										// })
+										Array.prototype.forEach.call(allElems, elem => {
+											elem.removeAttribute('inert')
+										})
 
-										// modalOpened.style.display = 'none'
-										// modalOpened = null
-										// allElems = []
-
+										imageModal.remove()
 										modal.remove()
+										focusedElementBefore.focus();
+
+										modal = null;
+										imageModal = null;
+										focusedElementBefore = null;
+									}
+
+									if (document.readyState === 'loading') {  // Loading hasn't finished yet
+										document.addEventListener('DOMContentLoaded', documentSetup);
+									} else {  // 'DOMContentLoaded' has already fired
+										documentSetup();
 									}
 								`,
 								}}
@@ -1000,32 +998,6 @@ const components = {
 
 		if (!items?.length) return null;
 
-		// const [inputTerm, setInputTerm] = preactHooks.useState("");
-
-		// const stylesForChildren = preactHooks.useMemo(() => {
-		//   const doNotMatchSelector = collection.children
-		//     .filter((article) => {
-		//       // const { id, status, codeName, props } = article?.data || {}
-		//       // console.log(article);
-		//       if (article?.data?.codeName.match(inputTerm)) {
-		//         return false;
-		//       }
-		//       return true;
-		//     })
-		//     .map((child) => `[data-id="${child.data.id}"]`)
-		//     .join(",");
-
-		//   return doNotMatchSelector ? `${doNotMatchSelector}{display: none;}` : "";
-		// }, [inputTerm, collection.children]);
-
-		// const childrenMatchingArray = collection.children?.map((child) => {
-		//   const str = [child.data.codeName].join(" ").toLowerCase();
-		//   return {
-		//     id: child.data.id,
-		//     str,
-		//   };
-		// });
-
 		const matchingItems = items?.map(({ poko, page, block }) => {
 			// NOTE: we could add multiple matchable strings and join them here
 			// const str = [poko.page.codeName].join(' ').toLowerCase();
@@ -1036,7 +1008,7 @@ const components = {
 				str,
 			};
 		});
-		console.log(matchingItems);
+		// console.log(matchingItems);
 
 		return (
 			<>
