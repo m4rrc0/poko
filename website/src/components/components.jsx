@@ -423,29 +423,33 @@ const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 					) : null}
 					{gallery?.[0] && (
 						<>
-							<div class="gallery grid" style="--width-column-min: 2rem;">
+							<components.ul class="reset gallery grid" style="--width-column-min: 2rem;">
 								{gallery.map(({ img }, i) => {
 									return (
-										<components.a
-											{...{
-												...pokoProps,
-												class: `gallery-item button`,
-												id: `gallery-item-${i}`,
-												['aria-label']: 'open image zoom',
-												href: img.src, // Gets removed on DOMContentLoaded
-												target: '_blank', // Gets removed on DOMContentLoaded
-												// role: button best practices as per: https://www.w3.org/TR/2016/WD-wai-aria-practices-1.1-20160317/examples/button/button.html
-												// onclick: `openModal(${i})`, // addEventListener on DOMContentLoaded
-												// onkeydown: `openModal(${i})`, // addEventListener on DOMContentLoaded
-												// tabindex: "0", // Gets added on DOMContentLoaded
-												// role: "button" // Gets added on DOMContentLoaded
-											}}
-										>
-											<components.ImgLazy {...{ ...pokoProps, ...img, id: `gallery-image-${i}` }} />
-										</components.a>
+										<components.li>
+											<components.a
+												{...{
+													...pokoProps,
+													class: `gallery-item button`,
+													id: `gallery-item-${i}`,
+													['aria-label']: 'open image zoom',
+													href: img.src, // Gets removed on DOMContentLoaded
+													target: '_blank', // Gets removed on DOMContentLoaded
+													// role: button best practices as per: https://www.w3.org/TR/2016/WD-wai-aria-practices-1.1-20160317/examples/button/button.html
+													// onclick: `openModal(${i})`, // addEventListener on DOMContentLoaded
+													// onkeydown: `openModal(${i})`, // addEventListener on DOMContentLoaded
+													// tabindex: "0", // Gets added on DOMContentLoaded
+													// role: "button" // Gets added on DOMContentLoaded
+												}}
+											>
+												<components.ImgLazy
+													{...{ ...pokoProps, ...img, id: `gallery-image-${i}` }}
+												/>
+											</components.a>
+										</components.li>
 									);
 								})}
-							</div>
+							</components.ul>
 							<style>{`
 							.gallery.grid > .gallery-item { background:none;border:none;padding:0; }
 							.modal { block-size:100%;inline-size:100%;background:rgba(255,255,255,0.9);z-index:1;margin:0!important;overscroll-behavior:contain; }

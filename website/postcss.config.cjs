@@ -25,8 +25,8 @@ module.exports = {
 				'logical-properties-and-values': {
 					preserve: true,
 				},
-				// "custom-selectors": {
-				//   preserve: false,
+				// 'custom-selectors': {
+				// 	preserve: false,
 				// },
 			},
 			// importFrom: `nuds/tokens.js`,
