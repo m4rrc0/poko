@@ -4,6 +4,7 @@ import StreamZip from 'node-stream-zip';
 import _set from 'lodash.set';
 
 export { notionHelpers } from './notionHelpers.mjs';
+export * as pokoHelpers from './pokoHelpers.mjs';
 
 export function slugify(string) {
 	const a = 'àáâäæãåāăąçćčđďèéêëēėęěğǵḧîïíīįìıİłḿñńǹňôöòóœøōõőṕŕřßśšşșťțûüùúūǘůűųẃẍÿýžźż·/_,:;';
@@ -38,7 +39,9 @@ export const slugifyPath = (codeName) => {
 	return { slug, path };
 };
 
-export const joinStrings = (arr, separator = ' ') => arr.filter((z) => z).join(separator);
+// export const joinStrings = (arr, separator = ' ') => arr.filter((z) => z).join(separator);
+export const mergeClasses = (arr, separator = ' ') =>
+	arr.filter((z) => typeof z === 'string' && z).join(separator);
 
 export function isObject(variable) {
 	return Object.prototype.toString.call(variable) === '[object Object]';
@@ -108,10 +111,14 @@ export function escapeRegExp(string) {
 }
 
 export const deepMergePropsSelf = (_arrOfPropsObj) => {
-	// Expand dot notation keys (only first level) before merging
 	const arrOfPropsObj = _arrOfPropsObj.map((propsObj) => {
 		for (const key in propsObj) {
-			if (key.match(/\./)) {
+			// Remove prop if null or undefined because it could overwrite some previous part of the merge
+			if (propsObj[key] == null) {
+				delete propsObj[key];
+			}
+			// Expand dot notation keys (only first level) before merging
+			if (/\./.test(key)) {
 				const val = propsObj[key];
 				delete propsObj[key];
 				_set(propsObj, key, val);
@@ -198,9 +205,10 @@ export const deepMergePropsAllPages = (_arrOfAncestorsProps) => {
 			const possibleComponentsAdded = Object.entries(propsPageMerged).reduce(
 				(prev, [key, val]) => {
 					const isFunction = typeof val === 'function';
+					// Any component except "style" and "title" which are important keywords in poko and not to be replaced anyway
 					const hasCompName =
 						typeof val === 'string' &&
-						/^[A-Z]|^wrapper$|^a$|^abbr$|^address$|^area$|^article$|^aside$|^audio$|^b$|^base$|^bdi$|^bdo$|^blockquote$|^body$|^br$|^button$|^canvas$|^caption$|^cite$|^code$|^col$|^colgroup$|^data$|^datalist$|^dd$|^del$|^details$|^dfn$|^dialog$|^div$|^dl$|^dt$|^em$|^embed$|^fieldset$|^figcaption$|^figure$|^footer$|^form$|^h1$|^h2$|^h3$|^h4$|^h5$|^h6$|^head$|^header$|^hr$|^html$|^i$|^iframe$|^img$|^input$|^ins$|^kbd$|^label$|^legend$|^li$|^link$|^main$|^map$|^mark$|^meta$|^meter$|^nav$|^noscript$|^object$|^ol$|^optgroup$|^option$|^output$|^p$|^param$|^picture$|^pre$|^progress$|^q$|^rp$|^rt$|^ruby$|^s$|^samp$|^script$|^section$|^select$|^small$|^source$|^span$|^strong$|^style$|^sub$|^summary$|^sup$|^svg$|^table$|^tbody$|^td$|^template$|^textarea$|^tfoot$|^th$|^thead$|^time$|^title$|^tr$|^track$|^u$|^ul$|^var$|^video$|^wbr$/.test(
+						/^[A-Z]|^wrapper$|^a$|^abbr$|^address$|^area$|^article$|^aside$|^audio$|^b$|^base$|^bdi$|^bdo$|^blockquote$|^body$|^br$|^button$|^canvas$|^caption$|^cite$|^code$|^col$|^colgroup$|^data$|^datalist$|^dd$|^del$|^details$|^dfn$|^dialog$|^div$|^dl$|^dt$|^em$|^embed$|^fieldset$|^figcaption$|^figure$|^footer$|^form$|^h1$|^h2$|^h3$|^h4$|^h5$|^h6$|^head$|^header$|^hr$|^html$|^i$|^iframe$|^img$|^input$|^ins$|^kbd$|^label$|^legend$|^li$|^link$|^main$|^map$|^mark$|^meta$|^meter$|^nav$|^noscript$|^object$|^ol$|^optgroup$|^option$|^output$|^p$|^param$|^picture$|^pre$|^progress$|^q$|^rp$|^rt$|^ruby$|^s$|^samp$|^script$|^section$|^select$|^small$|^source$|^span$|^strong$|^sub$|^summary$|^sup$|^svg$|^table$|^tbody$|^td$|^template$|^textarea$|^tfoot$|^th$|^thead$|^time$|^tr$|^track$|^u$|^ul$|^var$|^video$|^wbr$/.test(
 							key
 						);
 
@@ -300,3 +308,13 @@ export async function extractZip(fileObject, systemFile) {
 
 	await zip.close();
 }
+
+export const computeDataFromHelper = ({ function: funcName, ...params }) => {
+	if (typeof funcName !== 'string') {
+		console.error('Non string passed as helper function call');
+		return undefined;
+	}
+	const func = params.poko.helpers?.[funcName];
+	// console.log({ func });
+	return typeof func === 'function' ? func(params) : {};
+};

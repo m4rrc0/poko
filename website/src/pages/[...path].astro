@@ -19,6 +19,7 @@ import { getImage, getPicture } from '@astrojs/image';
 import probeImageSize from 'probe-image-size';
 
 import {
+	pokoHelpers,
 	slugify,
 	slugifyPath,
 	parseFileUrl,
@@ -72,6 +73,8 @@ export async function getStaticPaths() {
 	// const systemFileUserAssets = `${process.cwd()}/${projectFileUserAssets}`;
 
 	const DEBUG = process.argv.find((str) => str.match('DEBUG'));
+	// const AstroSite = Astro.site;
+	const SiteOrigin = Astro.site.origin;
 
 	let pokoPrev = {};
 	if (existsSync(systemFileData)) {
@@ -545,7 +548,10 @@ export async function getStaticPaths() {
 				node.props.poko.page.slug = node.slug;
 
 				// Just to avoid confusion with path that has no leading '/'
-				node.props.poko.page.href = '/' + (node.path ? node.path + '/' : '');
+				const href = '/' + (node.path ? node.path + '/' : '');
+				node.props.poko.page.href = href;
+				// Also write canonical URL
+				node.props.poko.page.canonicalUrl = SiteOrigin + href;
 
 				//
 				// Save a MAP of all the pages with the Notion ID, Notion URLs and our local path
@@ -927,6 +933,7 @@ export async function getStaticPaths() {
 			const selfProps = p.props;
 			// console.dir(selfProps, { depth: 3 });
 			selfProps.poko.pages = _pages;
+			selfProps.poko.helpers = pokoHelpers;
 			return [
 				{
 					params: { path: p.path },

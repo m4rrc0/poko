@@ -396,7 +396,7 @@ export function treeToMd(blocks) {
 
 export function populateChildPageOfBlock(_block, allRawPages) {
 	let block = _block;
-	let children = _block.children;
+	let children = _block?.children;
 
 	const linkToPageId = _block?.link_to_page?.page_id || _block?.link_to_page?.database_id;
 	const childPageTitle = _block?.child_page?.title || _block?.child_database?.title;

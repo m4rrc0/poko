@@ -9,6 +9,7 @@ const postcssPresetEnv = require('postcss-preset-env');
 // const cssMixins = require("./src/styles/mixins");
 // const cssFunctions = require("./src/styles/functions");
 const importUrl = require('postcss-import-url');
+const postcssInputRange = require('postcss-input-range');
 
 const shouldMinify = !process.env.DEBUG_CSS;
 
@@ -18,6 +19,7 @@ module.exports = {
 		// // postcssMixins({ mixins: cssMixins }),
 		// // postcssFunctions({ functions: cssFunctions }),
 		importUrl({ modernBrowser: true }),
+		postcssInputRange(),
 		postcssPresetEnv({
 			stage: 0,
 			autoprefixer: true,

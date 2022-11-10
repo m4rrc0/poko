@@ -83,13 +83,14 @@ export const presetsDico = {
 			h3: 'h4',
 			h4: 'h5',
 			h5: 'h6',
-			HeaderAfter: 'HeaderTitle',
+			Header: 'HeaderTitle',
 		},
 	},
-	MenuLevel1Pages: {
+	MenuPagesLevel1: {
 		components: {
-			MenuBefore: 'MenuLevel1Pages',
+			Menu: 'MenuPagesLevel1',
 		},
+		data: ['pagesLevel1'],
 	},
 	ImgLazy: {
 		components: {

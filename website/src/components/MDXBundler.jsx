@@ -7,7 +7,10 @@ import { getMDXComponent } from 'mdx-bundler/client/index.js';
 import deepmerge from 'deepmerge';
 // import { simpleDeepMerge } from '@utils'
 // import { components as ReactComponents } from "@components/ReactComponents.jsx";
-import pokoComponents, { addPropsonComponents } from '@components/components.jsx';
+import pokoComponents, {
+	retreiveComponents,
+	addPropsOnComponents,
+} from '@components/components.jsx';
 import ComponentFromPage from '@components/ComponentFromPage.jsx';
 
 export default function MDXBundler({
@@ -21,7 +24,7 @@ export default function MDXBundler({
 	// console.log(selfProps)
 	const { components: componentsFromProps } = selfProps.page;
 	// const props = deepmerge(dataForComponents, propsUserRest)
-	// const pokoComponentsWithProps = addPropsonComponents(pokoComponents, {
+	// const pokoComponentsWithProps = addPropsOnComponents(pokoComponents, {
 	// 	...selfProps,
 	// 	components: { ...pokoComponents },
 	// });
@@ -52,12 +55,12 @@ export default function MDXBundler({
 
 	// console.log({ componentsFromPages });
 
-	// const componentsFromPagesWithProps = addPropsonComponents(componentsFromPages, {
+	// const componentsFromPagesWithProps = addPropsOnComponents(componentsFromPages, {
 	// 	...selfProps,
 	// 	components: { ...pokoComponentsWithProps, ...componentsFromPages },
 	// });
 
-	// const componentsFromPropsWithProps = addPropsonComponents(componentsFromProps, {
+	// const componentsFromPropsWithProps = addPropsOnComponents(componentsFromProps, {
 	// 	...selfProps,
 	// 	components: {
 	// 		...pokoComponentsWithProps,
@@ -66,11 +69,20 @@ export default function MDXBundler({
 	// 	},
 	// });
 
+	// console.log({
+	// 	...pokoComponents,
+	// 	...componentsFromPages,
+	// 	...componentsFromProps,
+	// });
+
 	const componentsFullMerged = {
 		...pokoComponents,
 		...componentsFromPages,
 		...componentsFromProps,
 	};
+
+	// console.log(componentsFullMerged);
+
 	// console.log({propsUser, componentsFullMerged, dataForComponents})
 	// const propsDefaultForComponents = {
 	// 	...selfProps,
@@ -82,20 +94,23 @@ export default function MDXBundler({
 	// 	// Astro
 	// };
 
-	// const componentsWithProps = addPropsonComponents(componentsFullMerged, propsDefaultForComponents);
+	// const componentsWithProps = addPropsOnComponents(componentsFullMerged, propsDefaultForComponents);
 	// const components = deepmerge(componentsWithProps, componentsFromPages);
 	// const components = { ...componentsWithProps, ...componentsFromPages };
 
-	const components = addPropsonComponents(componentsFullMerged, {
+	const components = addPropsOnComponents(componentsFullMerged, {
 		...selfProps,
 		components: componentsFullMerged,
 	});
 
+	// TODO: components are not populated with all components defined in props???
+	// console.log(components);
+
 	// it's generally a good idea to memoize this function call to
 	// avoid re-creating the component every render.
 	// const Component = useMemo(() => getMDXComponent(code, { _jsx_runtime, ...props }), [code]);
-	const PageContent = useMemo(() => getMDXComponent(code), [code]);
+	const Wrapper = useMemo(() => getMDXComponent(code), [code]);
 	// const Component = getMDXComponent(code, { _jsx_runtime, ...props });
 	// console.log({propsUserRest})
-	return <PageContent {...{ ...selfProps, components }} />;
+	return <Wrapper {...{ ...selfProps, components }} />;
 }

@@ -1,8 +1,8 @@
 ---
 // import Debug from 'astro/debug';
-// import { notionHelpers } from "@utils";
+import { computeDataFromHelper } from '@utils';
 import { SkeletonPage } from '@root/src/layouts/index.mjs';
-// import pokoComponents, { addPropsonComponents } from "../components/components.jsx";
+// import pokoComponents, { addPropsOnComponents } from "../components/components.jsx";
 // import { toMdx } from '@services/notion.mjs'
 import MDXBundler from '../components/MDXBundler.jsx';
 import { bundleMDX } from 'mdx-bundler';
@@ -10,7 +10,7 @@ import { bundleMDX } from 'mdx-bundler';
 // import { MDXRemote } from "next-mdx-remote";
 import { mdxConfigForPages } from '@services/poko.mjs';
 
-const { href: canonicalUrl, pathname } = new URL(Astro.url.pathname, Astro.site);
+// const { href: canonicalUrl, pathname } = new URL(Astro.url.pathname, Astro.site);
 const {
 	// _page, _pages,
 	md,
@@ -21,9 +21,26 @@ const {
 	headString,
 } = Astro.props;
 
-selfProps.poko.page.pathname = pathname;
-selfProps.poko.page.canonicalUrl = canonicalUrl;
+// selfProps.poko.page.pathname = pathname;
+// selfProps.poko.page.canonicalUrl = canonicalUrl;
 
+const dataProp = selfProps.page.data;
+let computedDataProps = {};
+if (Array.isArray(dataProp)) {
+	for (const funcName of dataProp) {
+		computedDataProps[funcName] = computeDataFromHelper({ function: funcName, ...selfProps });
+	}
+} else if (typeof dataProp === 'string') {
+	computedDataProps[dataProp] = computeDataFromHelper({ function: dataProp, ...selfProps });
+} else if (selfProps.page.data == null) {
+	// Do nothing
+} else {
+	console.error('the `data` prop is neither a string nor an array');
+}
+
+selfProps.page = { ...selfProps.page, ...computedDataProps };
+
+// console.log({ computedDataProps });
 // const { md, props } = _page;
 
 // const mdx = md
@@ -37,7 +54,7 @@ const { code } = mdx;
 // console.log(props.components)
 ---
 
-<SkeletonPage {...{ path: pathname, ...selfProps.poko.page, ...selfProps.page }}>
+<SkeletonPage {...{ path: selfProps.poko.page.href, ...selfProps.poko.page, ...selfProps.page }}>
 	<Fragment slot="headString" set:html={headString} />
 
 	<!-- {code ? <MDXBundler {...{ code, frontmatter: undefined, props, dataForComponents }} /> : null} -->

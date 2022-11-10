@@ -1,4 +1,4 @@
-import { h } from 'preact';
+import { h, Fragment } from 'preact';
 // import * as preact from "preact";
 // import * as preactHooks from "preact/hooks";
 import { visitParents } from 'unist-util-visit-parents';
@@ -6,13 +6,20 @@ import { visitParents } from 'unist-util-visit-parents';
 import _get from 'lodash.get';
 // import _merge from 'lodash.merge';
 import deepmerge from 'deepmerge';
-import { notionHelpers, simpleDeepMerge, isObject, joinStrings } from '@utils';
+import {
+	notionHelpers,
+	simpleDeepMerge,
+	isObject,
+	mergeClasses,
+	computeDataFromHelper,
+} from '@utils';
 // import poko from "@poko";
 import Anon from '@components/Anon.jsx';
 // import { Img } from "astro-imagetools/components";
 // import { renderImg } from "astro-imagetools/api";
 // import * as userAssets from "../_data/*";
 
+let Content;
 // const { settings } = poko;
 
 // const getBlock = (tree, blockId) => {
@@ -46,37 +53,288 @@ import Anon from '@components/Anon.jsx';
 // 	return _collection;
 // };
 
-export const addProps = (Component, defaultProps, key) => {
-	if (typeof Component === 'function') {
+const pageToLinkData = (pageProps) => {
+	const {
+		page: { title, titleLink, titleMenu },
+		poko: {
+			page: { href, codeName },
+		},
+	} = pageProps;
+	const target = href.startsWith('/') ? '' : '_blank';
+
+	return {
+		children: titleLink || titleMenu || title || codeName,
+		href,
+		...(target ? { target } : {}),
+		...pageProps,
+	};
+};
+
+export const addProps = (Component, defaultProps, fromObjDef) => {
+	if (Component == null) {
+		return Component;
+	} else if (typeof Component === 'function') {
+		// NOTE: props here may be the props passed to the element in md (ex: 'href' on <a>)
 		return (props) => <Component {...{ ...defaultProps, ...props }} />;
 	} else if (typeof Component === 'string' && !!defaultProps.components[Component]) {
 		if (/^[A-Z]/.test(Component)) {
-			const Comp = defaultProps.components[Component];
+			// console.log(Component);
+
+			// if (Component === 'Top') console.log(Component, defaultProps);
+			let Comp = defaultProps.components[Component];
+			while (typeof Comp !== 'function') {
+				Comp = addProps(Comp, defaultProps);
+			}
+			// console.log(Comp);
 			return (props) => <Comp {...{ ...defaultProps, ...props }} />;
 		}
 		return Component;
+	} else if (Array.isArray(Component)) {
+		// Usefull for a list of children
+		// return () => <>{Component.map((CompI) => addProps(CompI, defaultProps))}</>;
+		return () => (
+			<Fragment>
+				{Component.map((CompI) => {
+					const ArrElem = addProps(CompI, defaultProps);
+					// console.log({ CompI, ArrElem });
+					return typeof ArrElem === 'function' ? <ArrElem /> : ArrElem;
+				})}
+			</Fragment>
+		);
+	} else if (typeof Component === 'object') {
+		if (Component.hasOwnProperty('component')) {
+			// Usefull if directly passing a component definition (as object)
+			// const { component, childrenComponents, ...restComponent } = Component;
+			// const Children = childrenComponents ? addProps(childrenComponents, defaultProps) : undefined;
+			// return addProps(component, {
+			// 	...defaultProps,
+			// 	...restComponent,
+			// 	...(Children ? { children: <Children /> } : {}),
+			// });
+			const { component, children, ...restComponent } = Component;
+			const Children = children == null ? children : addProps(children, defaultProps);
+
+			return addProps(
+				component,
+				{
+					...defaultProps,
+					...restComponent,
+					...(Children == null
+						? {}
+						: { children: typeof Children === 'function' ? <Children /> : Children }),
+				},
+				true
+			);
+		} else if (
+			typeof Component.type === 'function' &&
+			Component.hasOwnProperty('props') &&
+			Component.hasOwnProperty('__self')
+		) {
+			// console.log(typeof Component, Component);
+			// Should be a Preact component already
+			// return <Component {...defaultProps} />;
+			return () => Component;
+		}
+	} else if (Component === 'Content') {
+		return () => Content;
 	} else {
 		// withProps[key] = Component;
-		return null;
+		// return null;
+		return fromObjDef ? null : Component;
 	}
 };
 
-export const addPropsonComponents = (components, defaultProps) => {
+export const addPropsOnComponents = (components, defaultProps) => {
 	const withProps = {};
 
 	for (let [key, Component] of Object.entries(components)) {
-		if (Array.isArray(Component)) {
-			withProps[key] = () => <>{Component.map((CompI) => addProps(CompI, defaultProps, key))}</>;
+		// console.log(typeof Component);
+		if (Component == null) {
+			// is undefined or null
+			withProps[key] = Component;
+		} else if (Array.isArray(Component)) {
+			// console.log(Component);
+			// withProps[key] = () => <>{Component.map((CompI) => addProps(CompI, defaultProps))}</>;
+			withProps[key] = addProps(Component, defaultProps);
 		} else if (typeof Component === 'object') {
-			withProps[key] = addPropsonComponents(Component, defaultProps);
+			if (Component.hasOwnProperty('component')) {
+				// A component with passed props
+				withProps[key] = addProps(Component, defaultProps);
+			} else {
+				// this case is for nested components object. Ex: components = { Themes: { Light, Dark } }
+				withProps[key] = addPropsOnComponents(Component, defaultProps);
+			}
 		} else {
-			// NOTE: props here is the props passed to the element in md (ex: 'href' on <a>)
-			withProps[key] = addProps(Component, defaultProps, key);
+			withProps[key] = addProps(Component, defaultProps);
 		}
 	}
 
+	// console.log('components.CollectionArticleFooter: ', components.CollectionArticleFooter);
+	// console.log('withProps.CollectionArticleFooter: ', withProps.CollectionArticleFooter);
+	// console.log('defaultProps: ', defaultProps);
+
 	return withProps;
 };
+
+// export const addPropsOnComponents = (components, defaultProps) => {
+// 	const withProps = {};
+
+// 	for (let [key, Component] of Object.entries(components)) {
+// 		// console.log(typeof Component);
+// 		if (Component == null) {
+// 			// is undefined or null
+// 			withProps[key] = Component;
+// 			// } else if (Array.isArray(Component)) {
+// 			// 	withProps[key] = addProps(Component, defaultProps);
+// 		} else if (typeof Component === 'object') {
+// 			if (
+// 				typeof Component.type === 'function' &&
+// 				Component.hasOwnProperty('props') &&
+// 				Component.hasOwnProperty('__self')
+// 			) {
+// 				withProps[key] = (props) => Component;
+// 			} else {
+// 				// this case is for nested components object. Ex: components = { Themes: { Light, Dark } }
+// 				withProps[key] = addPropsOnComponents(Component, defaultProps);
+// 			}
+
+// 			// } else if (typeof Component === 'object') {
+// 			// 	if (Component.hasOwnProperty('component')) {
+// 			// 		// A component with passed props
+// 			// 		withProps[key] = addProps(Component, defaultProps);
+// 			// 	} else {
+// 			// 		// this case is for nested components object. Ex: components = { Themes: { Light, Dark } }
+// 			// 		withProps[key] = addPropsOnComponents(Component, defaultProps);
+// 			// 	}
+// 		} else {
+// 			// withProps[key] = addProps(Component, defaultProps);
+// 			// console.log(Component);
+// 			withProps[key] = (props) => <Component {...{ ...defaultProps, ...props }} />;
+// 		}
+// 	}
+
+// 	return withProps;
+// };
+
+// export const retreiveComponent = (Component, components, fromObjDef) => {
+// 	// Can return a function (=Preact component) or null or a random string
+// 	let CompRetrieved;
+// 	if (Component == null) {
+// 		// This is meant to capture null values because it would be recognized as object below otherwise
+// 		CompRetrieved = Component;
+// 	} else if (typeof Component === 'function') {
+// 		CompRetrieved = Component;
+// 	} else if (typeof Component === 'string' && !!components[Component]) {
+// 		CompRetrieved = components[Component] || Component;
+// 		// if (/^[A-Z]/.test(Component)) {
+// 		// 	CompRetrieved = components[Component];
+// 		// 	// console.log(Component);
+// 		// }
+// 		// CompRetrieved = Component;
+// 	} else if (Array.isArray(Component)) {
+// 		// Usefull for a list of children
+// 		// return () => <>{Component.map((CompI) => retreiveComponent(CompI, defaultProps))}</>;
+// 		CompRetrieved = () => (
+// 			<Fragment>
+// 				{Component.map((CompI) => {
+// 					let ArrElem = retreiveComponent(CompI, components);
+// 					// while (typeof ArrElem !== 'function' || (ArrElem == null)) {
+// 					// 	ArrElem = retreiveComponent(ArrElem, components);
+// 					// }
+// 					// console.log({ CompI, ArrElem });
+// 					return typeof ArrElem === 'function' ? <ArrElem /> : ArrElem;
+// 				})}
+// 			</Fragment>
+// 		);
+// 	} else if (typeof Component === 'object') {
+// 		if (Component.hasOwnProperty('component')) {
+// 			// Usefull if directly passing a component definition (as object)
+// 			// const { component, childrenComponents, ...restComponent } = Component;
+// 			// const Children = childrenComponents ? retreiveComponent(childrenComponents, defaultProps) : undefined;
+// 			// return retreiveComponent(component, {
+// 			// 	...defaultProps,
+// 			// 	...restComponent,
+// 			// 	...(Children ? { children: <Children /> } : {}),
+// 			// });
+// 			const { component, children, ...restComponent } = Component;
+// 			const Children = children == null ? children : retreiveComponent(children, components);
+// 			console.log({ children, Children });
+
+// 			CompRetrieved = retreiveComponent(component, components, true);
+// 			console.log({ CompRetrieved });
+
+// 			CompRetrieved =
+// 				typeof CompRetrieved !== 'function'
+// 					? CompRetrieved
+// 					: () => (
+// 							<CompRetrieved
+// 								{...{
+// 									...restComponent,
+// 									...(Children == null
+// 										? {}
+// 										: { children: typeof Children === 'function' ? <Children /> : Children }),
+// 								}}
+// 							/>
+// 					  );
+
+// 			console.log({ CompRetrieved });
+// 		} else if (
+// 			typeof Component.type === 'function' &&
+// 			Component.hasOwnProperty('props') &&
+// 			Component.hasOwnProperty('__self')
+// 		) {
+// 			// console.log(typeof Component, Component);
+// 			// Should be a Preact component already
+// 			// return <Component {...defaultProps} />;
+// 			return Component;
+// 		}
+// 	} else if (Component === 'Content') {
+// 		// This is for being able to reference the content of the Notion page when defining layouts manually
+// 		return Content;
+// 	} else {
+// 		// This should be a string not matching a component
+// 		// If this was passed from an object definition, it should not survive
+// 		return fromObjDef ? null : Component;
+// 	}
+
+// 	while (
+// 		!(
+// 			typeof CompRetrieved === 'function' ||
+// 			CompRetrieved == null ||
+// 			(typeof CompRetrieved === 'string' && !components[CompRetrieved])
+// 		)
+// 	) {
+// 		CompRetrieved = retreiveComponent(CompRetrieved, components);
+// 	}
+
+// 	return CompRetrieved;
+// };
+
+// export const retreiveComponents = (components) => {
+// 	const cleanCompList = {};
+
+// 	for (let [key, Component] of Object.entries(components)) {
+// 		if (Component == null) {
+// 			// is undefined or null
+// 			cleanCompList[key] = Component;
+// 		} else if (Array.isArray(Component)) {
+// 			// cleanCompList[key] = () => <>{Component.map((CompI) => retreiveComponent(CompI, defaultProps))}</>;
+// 			cleanCompList[key] = retreiveComponent(Component, { ...components, ...cleanCompList });
+// 		} else if (typeof Component === 'object') {
+// 			if (Component.hasOwnProperty('component')) {
+// 				// A component definition with passed props
+// 				cleanCompList[key] = retreiveComponent(Component, { ...components, ...cleanCompList });
+// 			} else {
+// 				// this case is for nested components object. Ex: components = { Themes: { Light, Dark } }
+// 				cleanCompList[key] = retreiveComponents(Component, { ...components, ...cleanCompList });
+// 			}
+// 		} else {
+// 			cleanCompList[key] = retreiveComponent(Component, { ...components, ...cleanCompList });
+// 		}
+// 	}
+
+// 	return cleanCompList;
+// };
 
 const setClassIf = (str, components) => (components[str] ? { class: str } : {});
 
@@ -93,6 +351,105 @@ Data (pass pokoProps by default)
     After
   /
 */
+const L = ({
+	children,
+	components,
+	poko,
+	page,
+	block,
+	data,
+	component,
+	tag,
+	Top: TopDef,
+	Bottom: BottomDef,
+	Middle: MiddleDef,
+	Aside: AsideDef,
+	Main: MainDef,
+	...props
+}) => {
+	// A Layout component with props: data, Top, Bottom, Aside, Main
+	// OR these might be named props
+	// EX: { component: 'L', Data: ['level1Pages'], tag: 'Fragment', Top: ['InfoTop', 'Menu'], Bottom: ['Footer', 'ScriptsBottom'], Aside: null, Main: ['MyHeader', 'Children'] }
+	// Then another component would be: {MyHeader: 'HeaderTitle'} so I can reassociate or nullify it as needed throughout the site
+
+	// if (typeof component !== 'string') {
+	// 	console.error(
+	// 		`component prop of ${JSON.stringify(component)} on Layout component is not a string`
+	// 	);
+	// 	console.log({
+	// 		// children,
+	// 		// components,
+	// 		// poko,
+	// 		// page,
+	// 		// block,
+	// 		// data,
+	// 		component,
+	// 		tag,
+	// 		Top: TopDef,
+	// 		// Bottom: BottomDef,
+	// 		// Middle: MiddleDef,
+	// 		// Aside: AsideDef,
+	// 		// Main: MainDef,
+	// 		// ...props,
+	// 	});
+	// 	return null;
+	// }
+
+	// Gather props and computed props
+	const pokoProps = { components, poko, page, block };
+	const _allProps = { ...pokoProps, ...props };
+	let computedDataProps = {};
+	if (Array.isArray(data)) {
+		for (const funcName of data) {
+			computedDataProps[funcName] = computeDataFromHelper({ function: funcName, ..._allProps });
+		}
+	} else if (typeof data === 'string') {
+		computedDataProps[data] = computeDataFromHelper({ function: data, ..._allProps });
+	}
+	const allProps = { ..._allProps, page: { ...page, ...computedDataProps } };
+
+	const Tag = components[tag] || Fragment;
+
+	// const allComponents = retreiveComponents({
+	// 	...components,
+	// 	Top: TopDef || undefined,
+	// 	Bottom: BottomDef || undefined,
+	// 	Middle: MiddleDef || undefined,
+	// 	Aside: AsideDef || undefined,
+	// 	Main: MainDef || undefined,
+	// });
+	// const { Top, Bottom, Middle = Fragment, Aside, Main = Fragment } =
+	// 	addPropsOnComponents(allComponents, allProps);
+
+	const {
+		Top,
+		Bottom,
+		Middle = Fragment,
+		Aside,
+		Main = Fragment,
+	} = addPropsOnComponents(
+		{
+			Top: TopDef || undefined,
+			Bottom: BottomDef || undefined,
+			Middle: MiddleDef || undefined,
+			Aside: AsideDef || undefined,
+			Main: MainDef || undefined,
+		},
+		allProps
+	);
+
+	return (
+		<Tag {...{ tag, ...allProps }}>
+			{Top && <Top {...allProps} />}
+			<Middle {...allProps}>
+				{Aside && <Aside {...allProps} />}
+				{/* <Main {...allProps}>{children}</Main> */}
+				{Main && <Main>{Content}</Main>}
+			</Middle>
+			{Bottom && <Bottom {...allProps} />}
+		</Tag>
+	);
+};
 // const LayoutBuilder = (ap) => {
 // 	return (
 // 		<>
@@ -190,6 +547,73 @@ const LayoutFooter = (ap) => (
 const wrapper = ({ children, components, poko, page, block, ...props }) => {
 	const pokoProps = { components, poko, page, block };
 	const allProps = { ...pokoProps, ...props };
+	Content = children;
+	// console.log({ children });
+
+	// const Content = () => <>{children}</>;
+
+	return <components.Layout {...allProps} />;
+};
+
+const LayoutDefault = ({ children, components, poko, page, block, ...props }) => {
+	const pokoProps = { components, poko, page, block };
+	const allProps = { ...pokoProps, ...props };
+
+	return (
+		<L
+			{...{
+				// tag: 'div',
+				...allProps,
+				// data: ['pagesLevel1'],
+				Top: components.Top || components.Menu,
+				Middle: components.Middle || components.Middle,
+				Aside: components.Aside || components.Aside,
+				Main: components.Main || [{ component: 'Header' }, { component: 'Content' }],
+				Bottom: components.Bottom || components.Footer,
+				// Top: { component: 'Element', tag: 'h2', children: 'Hey Menu', style: 'color: red;' },
+				// Top: () => <components.h2 style="color: blue;">Hey from function</components.h2>,
+				// Top: () => <LayoutMenu {...allProps} />,
+				// Top: [
+				// 	{ component: 'Element', tag: 'h2', children: 'Hey Menu', style: 'color: red;' },
+				// 	['Test1', () => <components.h2 style="color: blue;">Hey from function</components.h2>],
+				// ],
+				// Middle: () => <components.main {...{ ...allProps, children }} />,
+				// Aside: {
+				// 	component: 'Element',
+				// 	tag: 'aside',
+				// 	// children: 'Hello aside',
+				// 	children: [
+				// 		{
+				// 			component: 'Test',
+				// 		},
+				// 		{
+				// 			component: 'Element',
+				// 			tag: 'div',
+				// 			class: 'content-wrapper',
+				// 			children: 'Content',
+				// 		},
+				// 	],
+				// },
+				// Aside,
+				// Main: [LayoutHeader(allProps), LayoutContent(allProps)],
+				// Main: { component: 'Element', tag: 'div', class: 'main' },
+				// Main: {
+				// 	component: 'Element',
+				// 	tag: 'div',
+				// 	children: [
+				// 		'Test',
+				// 		page.title,
+				// 		{ component: 'Element', tag: 'h2', children: 'Hey Menu', style: 'color: red;' },
+				// 	],
+				// },
+				// Bottom: 'HeaderTest',
+			}}
+		/>
+	);
+};
+const wrapperOld = ({ children, components, poko, page, block, ...props }) => {
+	const pokoProps = { components, poko, page, block };
+	const allProps = { ...pokoProps, ...props };
 	// const hasSidebarMain =
 	// 	components.SidebarMainBefore || components.SidebarMain || components.SidebarMainAfter;
 
@@ -232,7 +656,7 @@ const ImgLazy = ({
 }) => {
 	const pokoProps = { components, poko, page, block };
 	return (
-		<E.div {...{ ...pokoProps, class: 'ImgLazyWrapper' + (className ? ` ${className}` : '') }}>
+		<E.div {...{ ...pokoProps, class: mergeClasses(['ImgLazyWrapper', className]) }}>
 			<E.img
 				{...{
 					...pokoProps,
@@ -243,7 +667,7 @@ const ImgLazy = ({
 					loading: 'lazy',
 					...props,
 					...img,
-					class: `ImgLazy` + (classNameImg ? ` ${classNameImg}` : ''),
+					class: mergeClasses([`ImgLazy`, classNameImg]),
 					onload: `this.parentNode.style.backgroundColor = 'transparent';this.style.opacity = 1;${
 						onload || ''
 					}`,
@@ -359,6 +783,38 @@ const CollectionArticleFooter = ({ components, poko, page, block, datePublished,
 			{author ? <E.p {...{ components, poko, page, block }}>by {author}</E.p> : null}
 		</E.div>
 	) : null;
+};
+const CollectionArticleFooterProduct = ({ components, poko, page, block }) => {
+	const pokoProps = { components, poko, page, block };
+	const { title, description, jsonld, gallery, price, _definition } = block || {};
+	const { canonicalUrl } = poko.block;
+	const ld = jsonld || {};
+	const featuredImage =
+		block.featuredImage?.[0] || block.featuredImage || ld.image?.[0] || ld.image;
+	const author = block.author || ld.author?.name;
+	const datePublished = block.datePublished || ld.datePublished?.start;
+	const ID = block.id || block.ID || block.sku || block.title || poko.block.id;
+	const priceSymbol = _definition?.price?.number?.format === 'euro' ? '€' : '?';
+
+	return (
+		price && (
+			<components.button
+				{...pokoProps}
+				style="z-index:0;/*--height-icon:1em;--width-icon:1em;*/"
+				class="snipcart-add-item fs-h6"
+				data-item-name={title}
+				data-item-id={ID}
+				data-item-price={price}
+				data-item-description={description}
+				data-item-image={featuredImage.url}
+				data-item-url={canonicalUrl}
+				data-item-has-taxes-included
+			>
+				{price}
+				{priceSymbol}
+			</components.button>
+		)
+	);
 };
 // const ColumnsWrapper = (props) => <div class="grid" {...props} />;
 // const Col = ({ ...block }) => {
@@ -480,6 +936,7 @@ const HeaderProduct = ({ components, poko, page, block, ...props }) => {
 									modalTemplate = document.createElement('div');
 									modalTemplate.setAttribute('class', 'modal cp- imposter fixed')
 									modalTemplate.setAttribute('aria-label', 'image zoom')
+									modalTemplate.setAttribute('aria-modal', 'true')
 									modalTemplate.innerHTML = \`
 										<div class="modal-content stack center intrinsic">
 											<!-- Image goes here -->
@@ -699,12 +1156,7 @@ const Element = ({
 	const props = { ...rest, ...blockPropsFromPage };
 	// const props = {}
 
-	const classMerged = [
-		typeof className === 'string' && className,
-		typeof blockPropsFromPage.class === 'string' && blockPropsFromPage.class,
-	]
-		.filter((z) => z)
-		.join(' ');
+	const classMerged = mergeClasses([className, blockPropsFromPage.class]);
 
 	// return ({ children, components, poko, page, block, ...props }) => <Anon {...{ tag: 'main', ...props }}>{children}</Anon>
 	return (
@@ -742,12 +1194,7 @@ const Component = ({
 	const props = { ...rest, ...blockPropsFromPage };
 	// const props = {}
 
-	const classMerged = [
-		typeof className === 'string' && className,
-		typeof blockPropsFromPage.class === 'string' && blockPropsFromPage.class,
-	]
-		.filter((z) => z)
-		.join(' ');
+	const classMerged = mergeClasses([className, blockPropsFromPage.class]);
 
 	return <Comp {...{ ...pokoProps, ...props, class: classMerged, children }} />;
 };
@@ -775,16 +1222,24 @@ const E = elementsTags.reduce(
 //  -> Means I can create footer content in many ways: page _Footer, export components.Footer which can even return an array, ...
 const components = {
 	Null,
+	Fragment,
+	L,
+	E,
+	...E,
 	BlockToPage,
 	Component,
 	C: Component,
 	Element,
-	E,
-	...E,
 
 	// --- SPECIAL COMPONENTS --- //
 	wrapper,
-	Layout: wrapper,
+	Layout: LayoutDefault,
+	LayoutDefault,
+	// Top: Null,
+	// Middle: Null,
+	// Aside: Null,
+	// Main: Null,
+	// Bottom: Null,
 	wrapperComponentFromPage: ({ children, components, poko, page, block, ...props }) => {
 		return children;
 	},
@@ -800,16 +1255,74 @@ const components = {
 	// 	);
 	//   return Child({ children, components, poko, page, block: { pages: topLevelPages } })
 	// },
-	// PagesLevel1: () => null,
-	MenuLevel1Pages: ({ children, components, poko, page, block }) => {
-		const pokoProps = { components, poko, page, block };
-		const topLevelPages = poko.pages.filter(
-			(p) => p.poko.page.status === 'published' && p.poko.page.parents?.length === 1
+	PagesLevel1Data: () => null,
+	List: ({ children, components, poko, page, block, tag, list, Item, ...props }) => {
+		const Tag = components[tag] || components.ul;
+		const ItemComp = components[Item] || components[children];
+		return (
+			<Tag {...{ ...pokoProps, class: mergeClasses(['List', props?.class]) }}>
+				{Array.isArray(list) &&
+					list.map(pageToLinkData).map((listItemData) => (
+						<components.li {...{ class: 'Menu-right-item', ...pokoProps }}>
+							<components.a
+								{...{
+									// href,
+									class: 'Menu-right-a',
+									// children: titleMenu || title || codeName,
+									// ...pokoProps,
+									...listItemData,
+								}}
+							/>
+						</components.li>
+					))}
+			</Tag>
 		);
+	},
+	ListItem: (listItemData) => null,
+	PagesLevel1List: ({ children, components, poko, page, block, tag, ...props }) => {
+		const pokoProps = { components, poko, page, block };
+		const allProps = { ...pokoProps, ...props };
+		const Tag = components[tag] || components.ul;
 
-		const index = topLevelPages?.find((p) => p.poko.page.codeName === 'index');
-		const pages = topLevelPages?.filter((p) => p.poko.page.codeName !== 'index');
+		// const topLevelPages = poko.pages.filter(
+		// 	(p) => p.poko.page.status === 'published' && p.poko.page.parents?.length === 1
+		// );
 
+		return (
+			<Tag {...{ ...allProps, class: mergeClasses([`PagesLevel1List`, props.class]) }}>
+				{page.pagesLevel1 &&
+					page.pagesLevel1.map(
+						({
+							page: { title, titleMenu },
+							poko: {
+								page: { href, codeName },
+							},
+						}) => (
+							<components.li {...{ class: `Menu-list-item ${codeName}`, ...pokoProps }}>
+								<components.a
+									{...{
+										href,
+										class: `Menu-list-a ${codeName}`,
+										children: titleMenu || title || codeName,
+										...pokoProps,
+									}}
+								/>
+							</components.li>
+						)
+					)}
+			</Tag>
+		);
+	},
+	MenuPagesLevel1: ({ children, components, poko, page, block, tag, ...props }) => {
+		const pokoProps = { components, poko, page, block };
+		const allProps = { ...pokoProps, ...props };
+		const Tag = components[tag] || components.nav;
+
+		return (
+			<Tag {...{ ...allProps, class: mergeClasses(['Menu MenuPagesLevel1', props.class]) }}>
+				<components.PagesLevel1List {...{ ...pokoProps, class: `List` }} />
+			</Tag>
+		);
 		return (
 			<components.nav {...{ class: 'Menu', ...pokoProps }}>
 				<components.div {...{ class: 'Menu-left', ...pokoProps }}>
@@ -883,6 +1396,8 @@ const components = {
 			);
 		});
 
+		// console.log(components.CollectionArticleFooter);
+
 		return collectionItems.length ? (
 			<components.CollectionWrapper {...{ ...pokoPropsCollection }}>
 				{collectionItems.map(({ poko, page, block }) => {
@@ -952,6 +1467,7 @@ const components = {
 	CollectionArticleFeaturedImage,
 	CollectionArticleHeading,
 	CollectionArticleFooter,
+	// CollectionArticleFooterProduct,
 	CollectionPageHeader: ({ components, poko, page, block, ...props }) => {
 		const pokoProps = { components, poko, page, block };
 		const allProps = { ...pokoProps, ...props };
@@ -1117,11 +1633,13 @@ const components = {
 	// Col,
 	// Column: () => null,
 	//
-	// Test: () => {
-	//   return (
-	//     <Poko>{({ poko }) => <div>{poko?.pages?.[1]?.data?.codeName}</div>}</Poko>
-	//   );
-	// },
+	Test: () => {
+		return <p>This is a test component</p>;
+	},
+	Test1: () => {
+		return <p>This is another test component</p>;
+	},
+	Test2: ['Test', 'Test1'],
 };
 
 export default components;
