@@ -4,6 +4,7 @@ import { h, Fragment } from 'preact';
 import { visitParents } from 'unist-util-visit-parents';
 // import { store } from "@services/notion.js";
 import _get from 'lodash.get';
+import _sortBy from 'lodash.sortby';
 // import _merge from 'lodash.merge';
 import deepmerge from 'deepmerge';
 import {
@@ -795,24 +796,44 @@ const CollectionArticleFooterProduct = ({ components, poko, page, block }) => {
 	const datePublished = block.datePublished || ld.datePublished?.start;
 	const ID = block.id || block.ID || block.sku || block.title || poko.block.id;
 	const priceSymbol = _definition?.price?.number?.format === 'euro' ? '€' : '?';
+	const priceFormatted = parseFloat(price).toFixed(2).toString().replace('.', ',');
 
 	return (
 		price && (
-			<components.button
-				{...pokoProps}
-				style="z-index:0;/*--height-icon:1em;--width-icon:1em;*/"
-				class="snipcart-add-item fs-h6"
-				data-item-name={title}
-				data-item-id={ID}
-				data-item-price={price}
-				data-item-description={description}
-				data-item-image={featuredImage.url}
-				data-item-url={canonicalUrl}
-				data-item-has-taxes-included
-			>
-				{price}
-				{priceSymbol}
-			</components.button>
+			<>
+				<hr />
+				<components.div
+					{...pokoProps}
+					class="CollectionArticleFooter cluster"
+					style="justify-content: flex-end;"
+				>
+					<components.p {...pokoProps} class="fs-h5">
+						{priceFormatted}
+						{priceSymbol}
+					</components.p>
+					<components.button
+						{...pokoProps}
+						style="z-index:0;--height-icon:1em;--width-icon:1em;margin-right:0;margin-bottom:0;"
+						class="snipcart-add-item fs-h5"
+						data-item-name={title}
+						data-item-id={ID}
+						data-item-price={price}
+						data-item-description={description}
+						data-item-image={featuredImage.url}
+						data-item-url={canonicalUrl}
+						data-item-has-taxes-included
+					>
+						<span class="with-icon" style="display:flex;" role="img" aria-label="Ajouter au panier">
+							<svg class="icon" width="1em" height="1em" viewBox="0 0 24 24">
+								<path
+									fill="currentcolor"
+									d="M11 9h2V6h3V4h-3V1h-2v3H8v2h3v3zm-4 9c-1.1 0-1.99.9-1.99 2S5.9 22 7 22s2-.9 2-2s-.9-2-2-2zm10 0c-1.1 0-1.99.9-1.99 2s.89 2 1.99 2s2-.9 2-2s-.9-2-2-2zm-9.83-3.25l.03-.12l.9-1.63h7.45c.75 0 1.41-.41 1.75-1.03l3.86-7.01L19.42 4h-.01l-1.1 2l-2.76 5H8.53l-.13-.27L6.16 6l-.95-2l-.94-2H1v2h2l3.6 7.59l-1.35 2.45c-.16.28-.25.61-.25.96c0 1.1.9 2 2 2h12v-2H7.42c-.13 0-.25-.11-.25-.25z"
+								></path>
+							</svg>
+						</span>
+					</components.button>
+				</components.div>
+			</>
 		)
 	);
 };
@@ -1381,7 +1402,7 @@ const components = {
 		return components.LinkToPage({ components, poko, page, block: linkedPage });
 	},
 	LinkToPage: BlockToPage,
-	CollectionData: ({ components, poko, page, block, blockRaw }) => {
+	CollectionData: ({ components, poko, page, block, blockRaw, ...props }) => {
 		const pokoPropsCollection = { components, poko, page, block };
 		// NOTE: receives special prop: blockRaw
 		// const blockId = blockRaw.id
@@ -1396,11 +1417,15 @@ const components = {
 			);
 		});
 
-		// console.log(components.CollectionArticleFooter);
+		const { sort } = { ...page.subBlocks?.CollectionData, ...props };
 
-		return collectionItems.length ? (
+		const collectionItemsSorted = sort ? _sortBy(collectionItems, sort) : collectionItems;
+
+		// console.log(propsFromFm);
+
+		return collectionItemsSorted.length ? (
 			<components.CollectionWrapper {...{ ...pokoPropsCollection }}>
-				{collectionItems.map(({ poko, page, block }) => {
+				{collectionItemsSorted.map(({ poko, page, block }) => {
 					const pokoPropsItem = {
 						components,
 						poko: {
@@ -1438,11 +1463,11 @@ const components = {
 						<components.CollectionArticle
 							{...{
 								...pokoPropsItem,
-								featuredImage,
-								href: poko.page.href,
-								title,
-								datePublished,
-								author,
+								// featuredImage,
+								// href: poko.page.href,
+								// title,
+								// datePublished,
+								// author,
 							}}
 						>
 							<components.CollectionArticleFeaturedImage {...{ ...pokoPropsItem, featuredImage }} />
