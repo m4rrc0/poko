@@ -8,7 +8,7 @@ const ComponentFromPage = ({
 	frontmatter,
 	...props
 }) => {
-	const Comp = useMemo(() => getMDXComponent(code), [code]);
+	const Comp = useMemo(() => getMDXComponent(code), [code, props]);
 
 	return <Comp {...{ components, ...props }} />;
 };

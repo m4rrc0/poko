@@ -29,16 +29,11 @@ export async function getStaticPaths() {
 	const blocks = await getBlockChildren(rootID);
 	const plainTextBlocksAsStrings = blocks
 		.filter((b) => b?.code?.language === 'plain text')
-		.map((b) => {
-			console.log('RT: ', b?.code?.rich_text);
-			return b?.code?.rich_text?.[0]?.plain_text || '';
-		});
-	const redirectsString = plainTextBlocksAsStrings.find((b) => b.startsWith('# /_redirects'));
-
-	// const redirectsString = plainTextBlocksAsStrings?.code?.rich_text?.[0]?.plain_text || '';
+		.map((b) => b?.code?.rich_text?.[0]?.plain_text || '');
+	const redirectsString = plainTextBlocksAsStrings.find((b) => b.startsWith('# /_redirects')) || '';
 
 	if (!redirectsString) {
-		console.warn('No global Styles found');
+		console.info('No redirects defined');
 	}
 
 	return [{ params: { filename: '_redirects' }, props: { body: redirectsString } }];

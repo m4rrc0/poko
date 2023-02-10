@@ -36,6 +36,8 @@ export default function MDXBundler({
 		// console.log(cfp.mdx.code)
 		const key = cfp.codeName.replace(/^_/, '');
 		// const Comp = useMemo(() => getMDXComponent(cfp.mdx?.code), [cfp.mdx?.code]);
+		const blockPropsFromComponentPage = cfp.props.page;
+
 		const Comp = (props) => (
 			<ComponentFromPage
 				{...{
@@ -43,6 +45,10 @@ export default function MDXBundler({
 					frontmatter: undefined,
 					components: { ...pokoComponents, ...componentsFromProps },
 					...selfProps,
+					block: {
+						...selfProps.block,
+						...blockPropsFromComponentPage,
+					},
 					...props,
 				}}
 			/>
