@@ -29,6 +29,7 @@ export default function MDXBundler({
 	// 	components: { ...pokoComponents },
 	// });
 
+	// TODO: Apparently, they don't receive default props
 	// ComponentsFromPages
 	let componentsFromPages = {};
 	_componentsFromPages.forEach((cfp) => {

@@ -341,6 +341,7 @@ export function treeToMd(blocks) {
 		.replace(/”/g, '"')
 		.replace(/⇒/g, '=>')
 		.replace(/→/g, '->')
+		.replace(/…/g, '...')
 		.replace(/—/g, '-');
 	// console.log({ mdString });
 	return mdString;

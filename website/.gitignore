@@ -4,6 +4,7 @@ dist/
 public/user-assets
 public/user-images
 src/_data
+.astro
 
 # dependencies
 node_modules/

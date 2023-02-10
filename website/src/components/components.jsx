@@ -756,7 +756,7 @@ const CollectionArticle = ({ components, poko, page, block, children, ...props }
 };
 const CollectionArticleFeaturedImage = ({ components, poko, page, block, featuredImage }) => {
 	// console.log({ featuredImage });
-	const fi = featuredImage?.[0] || featuredImage;
+	const fi = Array.isArray(featuredImage) ? featuredImage[0] : featuredImage;
 	return fi ? (
 		<components.ImgLazy
 			{...{ components, poko, page, block, class: 'CollectionArticleFeaturedImage', ...fi?.img }}
