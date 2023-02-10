@@ -8,7 +8,7 @@ import deepmerge from 'deepmerge';
 // import { simpleDeepMerge } from '@utils'
 // import { components as ReactComponents } from "@components/ReactComponents.jsx";
 import pokoComponents, {
-	retreiveComponents,
+	// retreiveComponents,
 	addPropsOnComponents,
 } from '@components/components.jsx';
 import ComponentFromPage from '@components/ComponentFromPage.jsx';

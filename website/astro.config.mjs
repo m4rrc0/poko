@@ -34,9 +34,6 @@ const site = process.env.SITE;
 
 // @ts-check
 export default defineConfig({
-	// experimental: {
-	//   integrations: true,
-	// },
 	...(site ? { site } : {}),
 	integrations: [
 		...(site ? [sitemap(), robotsTxt()] : []),
