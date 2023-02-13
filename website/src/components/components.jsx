@@ -1169,7 +1169,7 @@ const Element = ({
 	else if (Array.isArray(subSelectors)) ss.push(...subSelectors);
 
 	const blockPropsFromPageArr = ss
-		.map((subPropsPath) => block.subBlocks?.[subPropsPath] || page.subBlocks?.[subPropsPath])
+		.map((subPropsPath) => block?.subBlocks?.[subPropsPath] || page?.subBlocks?.[subPropsPath])
 		.filter((z) => z);
 	const blockPropsFromPage = blockPropsFromPageArr[blockPropsFromPageArr.length - 1] || {};
 
